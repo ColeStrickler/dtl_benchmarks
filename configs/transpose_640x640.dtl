@@ -1,0 +1,10 @@
+int row_size = 2560;
+int col_size = 4;
+
+for (int col = 0; col < 640; col++)
+{
+    for (int row = 0; row < 640; row++)
+    {
+        out = row*row_size + col*col_size;
+    }
+}
