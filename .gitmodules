@@ -1,0 +1,3 @@
+[submodule "src/dtl"]
+	path = src/dtl
+	url = git@github.com:ColeStrickler/agu_dtl.git
