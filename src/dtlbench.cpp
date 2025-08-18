@@ -44,7 +44,7 @@ int main() {
                                               RELCACHE_ADDR);
 
   // we first will allocate matrix B on the rme region
-  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 6, 4, 8);
+  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 6, 4, 3);
   DTL::API api(hwStat);
 
   int alloc_size = DIMENSION * DIMENSION * sizeof(float);
@@ -59,19 +59,46 @@ int main() {
   // BENCH(matmult_opt2_jk_tiling(A, B, C, DIMENSION));
   //  toFile("opt2.out", C, DIMENSION);
   BENCH(matmult_opt3_transposed(A, B, C, &Bt, DIMENSION));
-  toFile("opt3A.out", A, DIMENSION);
+ // toFile("opt3A.out", A, DIMENSION);
   toFile("opt3.out", C, DIMENSION);
-  toFile("opt3B.out", Bt, DIMENSION);
+  //toFile("opt3B.out", Bt, DIMENSION);
+
+
+  //init_data(A, B, C, DIMENSION);
+  auto start = std::chrono::high_resolution_clock::now();
+  //matmult_opt3_pretransposed(A,Bt,C, DIMENSION);
+  auto end = std::chrono::high_resolution_clock::now();
+  double elapsed = std::chrono::duration<double>(end - start).count();
+  double checksum = print_checksum(C, DIMENSION);
+  //toFile("opt3Pre.out", C, DIMENSION);
+  //printf("%.12s  secs: %.6f  chsum: %.6f\n",
+  //       "matmult_opt3_pretransposed",
+  //       elapsed,
+  //       checksum);
   
   // chsum: 1440.415743
   // chsum: 1474.542120
   // chsum: 1452.471111
   // chsum: 1444.091102
   init_data(A, B, C, DIMENSION);
+
+
+  float *bcopy = (float *)malloc(alloc_size);
+  copy_matrix(B, bcopy, DIMENSION);
+  printf("copied B\n");
+  zero_matrix(B, DIMENSION);
+  printf("zeroed\n");
+  init_bank_aware_transpose((uint64_t)plim, bcopy, DIMENSION);
+
   api.SetBaseAddr((uint64_t)agu_config_base);
-  if (!api.Compile(FileToString("./transpose_640x640.dtl"))) {
-    printf("Failed to compile dtl program or map onto agu\n");
-    return 0;
+  //if (!api.Compile(FileToString("./transpose_640x640.dtl"))) {
+  //  printf("Failed to compile dtl program or map onto agu\n");
+  //  return 0;
+  //}
+
+  if (!api.Compile(FileToString("./bankaware_640x640.dtl"))) {
+     printf("Failed to compile dtl program or map onto agu\n");
+     return 0;
   }
   api.ProgramHardware();
 
@@ -93,12 +120,19 @@ int main() {
   flush_cache();
   EnableRelCache(hpm_fd);
 
+
+  
+  
+  
+  
   toFile("optdtlB.out", B, DIMENSION);
-  auto start = std::chrono::high_resolution_clock::now();
+  
+  
+  start = std::chrono::high_resolution_clock::now();
   matmult_dtl_transposed(A, B, C, DIMENSION);
-  auto end = std::chrono::high_resolution_clock::now();
-  double elapsed = std::chrono::duration<double>(end - start).count();
-  double checksum = print_checksum(C, DIMENSION);
+  end = std::chrono::high_resolution_clock::now();
+  elapsed = std::chrono::duration<double>(end - start).count();
+  checksum = print_checksum(C, DIMENSION);
   toFile("optdtlA.out", A, DIMENSION);
   
   toFile("optdtl.out", C, DIMENSION);

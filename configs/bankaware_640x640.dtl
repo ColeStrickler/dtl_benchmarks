@@ -1,0 +1,15 @@
+int col_size = 4;
+int bank_stride = 8192;
+int bank_count = 8;
+
+for (int stride = 0; stride < 25; stride++)
+{
+    for (int bank_element_count = 0; bank_element_count < 2048; bank_element_count++)
+    {
+        for (int bank = 0; bank < 8; bank++)
+        {
+            out = bank_element_count*col_size + bank*bank_stride + stride*(bank_count*bank_stride);
+        }
+    }
+
+}

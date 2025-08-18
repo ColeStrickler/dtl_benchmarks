@@ -17,6 +17,24 @@ do { \
     printf("%.12s  secs: %.6f  chsum: %.6f\n", #func, elapsed, checksum); \
 } while (0)
 
+
+#define BENCH(func) \
+do { \
+    init_data(A, B, C, DIMENSION); \
+    auto start = std::chrono::high_resolution_clock::now(); \
+    func; \
+    auto end = std::chrono::high_resolution_clock::now(); \
+    double elapsed = std::chrono::duration<double>(end - start).count(); \
+    double checksum = print_checksum(C, DIMENSION); \
+    printf("%.12s  secs: %.6f  chsum: %.6f\n", #func, elapsed, checksum); \
+} while (0)
+
+void zero_matrix(float* matrix, int dimension);
+
+void init_bank_aware_transpose(uint64_t base, float* write_out, int dimension);
+
+void copy_matrix(float* src, float* dst, int dimension);
+
 double timestamp();
 
 void init_data(float *A, float *B, float *C, int dimension);
@@ -34,5 +52,7 @@ void transpose_naive(float *src, float *dst, int src_row, int src_col);
 void matmult_opt3_transposed(float *A, float *B, float *C, float** Bt, int dimension);
 
 void matmult_dtl_transposed(float *A, float *B, float *C, int dimension);
+
+void matmult_opt3_pretransposed(float *A, float* bt, float *C, int dimension);
 
 #endif

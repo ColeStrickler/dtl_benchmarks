@@ -2,6 +2,58 @@
 
 
 
+void init_bank_aware_transpose(uint64_t base, float* write_out, int dimension)
+{
+    int bank_stride = (1 << 13);
+    int bank_count = 8;
+
+    int o_row = 0;
+    int o_col = 0;
+
+    int row_size = 2560;
+    int col_size = 4;
+
+
+    for (int stride = 0; stride < 25; stride++)
+    {
+        for (int bank_element_count = 0; bank_element_count < 2048; bank_element_count++)
+        {
+            for (int bank = 0; bank < 8; bank++)
+            {
+                //printf("stride %d, bank_element_count %d, bank %d\n", stride, bank_element_count, bank);
+                *(float*)(base + bank_element_count*col_size + bank*bank_stride + stride*(bank_count*bank_stride)) = write_out[dimension*o_row+o_col];
+                o_row++;
+                if (o_row == dimension)
+                    o_col++;
+                o_row %= dimension;
+            }
+        }
+
+    }
+}
+
+
+void zero_matrix(float* matrix, int dimension)
+{
+    for(int i = 0; i < dimension; i++) {
+        for(int j = 0; j < dimension; j++) {
+            matrix[dimension*i+j] = 0.0f;
+            //printf("%f %f\n", A[dimension*i+j], B[dimension*i+j]);
+        }
+    }
+}
+
+void copy_matrix(float* src, float* dst, int dimension)
+{
+    for(int i = 0; i < dimension; i++) {
+        for(int j = 0; j < dimension; j++) {
+            dst[dimension*i+j] = src[dimension*i+j];
+            //printf("%f %f\n", A[dimension*i+j], B[dimension*i+j]);
+        }
+    }
+}
+
+
 void init_data(float *A, float *B, float *C, int dimension)
 {
     int i, j, k;
@@ -106,6 +158,27 @@ void matmult_opt3_transposed(float *A, float *B, float *C, float** Bt, int dimen
     }
     //free(Bt);
 }
+
+// matrix multiplicaiton after transposed
+void matmult_opt3_pretransposed(float *A, float* bt, float *C, int dimension)
+{
+    int i,j,k;
+    int alloc_size = dimension*dimension*sizeof(float);
+    //*Bt = (float*)malloc(alloc_size);
+
+
+
+    for(i = 0; i < dimension; i++) {
+        for(j = 0; j < dimension; j++) {
+            for(k = 0; k < dimension; k++) {                            
+                C[dimension*i+j] += (A[dimension*i+k] * bt[dimension*j+k]);
+            }
+        }
+    }
+    //free(Bt);
+}
+
+
 
 
 // matrix multiplicaiton after transposed
