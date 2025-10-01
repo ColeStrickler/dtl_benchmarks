@@ -18,16 +18,26 @@ do { \
 } while (0)
 
 
-#define BENCH(func) \
+#define BENCH_INT(func) \
 do { \
-    init_data(A, B, C, DIMENSION); \
+    init_data_int(A, B, C, DIMENSION); \
     auto start = std::chrono::high_resolution_clock::now(); \
     func; \
     auto end = std::chrono::high_resolution_clock::now(); \
     double elapsed = std::chrono::duration<double>(end - start).count(); \
-    double checksum = print_checksum(C, DIMENSION); \
+    double checksum = print_checksum((float*)C, DIMENSION); \
     printf("%.12s  secs: %.6f  chsum: %.6f\n", #func, elapsed, checksum); \
 } while (0)
+
+
+void zero_matrix_int(int* matrix, int dimension);
+void copy_matrix_int(int* src, int* dst, int dimension);
+void init_data_int(int *A, int *B, int *C, int dimension);
+double print_checksum_int(int* C, int dimention);
+void transpose_naive_int(int *src, int *dst, int src_row, int src_col);
+void matmult_opt3_transposed_int(int *A, int *B, int *C, int dimension);
+void matmult_dtl_transposed_int(int *A, int *B, int *C, int dimension);
+void init_bank_aware_transpose_int(uint64_t base, int* write_out, int dimension);
 
 void zero_matrix(float* matrix, int dimension);
 

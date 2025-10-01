@@ -6,6 +6,9 @@
 #include "util.hpp"
 
 #define DIMENSION 640
+#define RME_SHIFT 0x8000000UL
+#define TO_RME(addr) (((uint64_t)addr) + RME_SHIFT)
+
 
 void toFile(const std::string &file, float *res, int dimension) {
   std::ofstream ofs(file);
@@ -23,10 +26,72 @@ void toFile(const std::string &file, float *res, int dimension) {
   ofs.close();
 }
 
+
+
+
+
+void toFile_int(const std::string &file, int *res, int dimension) {
+  std::ofstream ofs(file);
+  if (!ofs.is_open()) {
+    // Handle error opening file
+    return;
+  }
+
+  for (int i = 0; i < dimension; i++) {
+    for (int j = 0; j < dimension; j++) {
+      ofs << std::to_string(i) << "," << std::to_string(j) << ": "
+          << res[i * dimension + j] << "\n";
+    }
+  }
+  ofs.close();
+}
+int open_fd() {
+    int fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (fd == -1) {
+        printf("Can't open /dev/mem.\n");
+        exit(0);
+    }
+    return fd;
+}
+
 int main() {
+  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 5, 6, 4, 3, 1);
+  auto api = new DTL::API(hwStat);
+  auto ephemeral = api->AllocEphemeralRegion(0x100000);
 
-  int hpm_fd = open_fd();
+  if (!api->Compile(FileToString("./transpose_640x640.dtl"))) {
+    printf("Failed to compile dtl program or map onto agu\n");
+    return 0;
+  }
+  api->ProgramHardware(ephemeral);
+  printf("Successfully programmed agu\n");
 
+
+
+  // Access with bounds checking
+  uint8_t a = ephemeral->GuardedRead_8(0);
+  ephemeral->GuardedWrite_8(0, 0x1);
+
+  // move to new physical address so writes propagate
+  ephemeral->Sync();
+
+
+  // we shhould now get new data
+  uint8_t b = ephemeral->GuardedRead_8(0);
+  printf("Check a %c, %c\n", a, b);
+
+  // also allow headless acess if needed
+  void* ephemeral_raw = ephemeral->GetHeadlessReadRegion();
+
+
+  api->FreeEphemeralRegion(ephemeral);
+
+
+
+
+
+
+/*
   unsigned long *config = (unsigned long *)mmap(NULL,
                                                 RME_CONFIG_SIZE,
                                                 PROT_READ | PROT_WRITE,
@@ -44,7 +109,7 @@ int main() {
                                               RELCACHE_ADDR);
 
   // we first will allocate matrix B on the rme region
-  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 6, 4, 3);
+  
   DTL::API api(hwStat);
 
   int alloc_size = DIMENSION * DIMENSION * sizeof(float);
@@ -59,55 +124,19 @@ int main() {
   // BENCH(matmult_opt2_jk_tiling(A, B, C, DIMENSION));
   //  toFile("opt2.out", C, DIMENSION);
   BENCH(matmult_opt3_transposed(A, B, C, &Bt, DIMENSION));
- // toFile("opt3A.out", A, DIMENSION);
+  toFile("opt3A.out", A, DIMENSION);
   toFile("opt3.out", C, DIMENSION);
-  //toFile("opt3B.out", Bt, DIMENSION);
-
-
-  //init_data(A, B, C, DIMENSION);
-  auto start = std::chrono::high_resolution_clock::now();
-  //matmult_opt3_pretransposed(A,Bt,C, DIMENSION);
-  auto end = std::chrono::high_resolution_clock::now();
-  double elapsed = std::chrono::duration<double>(end - start).count();
-  double checksum = print_checksum(C, DIMENSION);
-  //toFile("opt3Pre.out", C, DIMENSION);
-  //printf("%.12s  secs: %.6f  chsum: %.6f\n",
-  //       "matmult_opt3_pretransposed",
-  //       elapsed,
-  //       checksum);
-  
+  toFile("opt3B.out", Bt, DIMENSION);
+  */
   // chsum: 1440.415743
   // chsum: 1474.542120
   // chsum: 1452.471111
   // chsum: 1444.091102
-  init_data(A, B, C, DIMENSION);
-
-
-  float *bcopy = (float *)malloc(alloc_size);
-  copy_matrix(B, bcopy, DIMENSION);
-  printf("copied B\n");
-  zero_matrix(B, DIMENSION);
-  printf("zeroed\n");
-  init_bank_aware_transpose((uint64_t)plim, bcopy, DIMENSION);
-
-  api.SetBaseAddr((uint64_t)agu_config_base);
-  //if (!api.Compile(FileToString("./transpose_640x640.dtl"))) {
-  //  printf("Failed to compile dtl program or map onto agu\n");
-  //  return 0;
-  //}
-
-  if (!api.Compile(FileToString("./bankaware_640x640.dtl"))) {
-     printf("Failed to compile dtl program or map onto agu\n");
-     return 0;
-  }
-  api.ProgramHardware();
-
-  printf("Successfully compiled dtl\n");
-  printf("Successfully programmed agu\n");
+  //init_data(A, B, C, DIMENSION);
 
 
   
-
+/*
 
   if (configure_relcache() == -1) {
     printf("Unable to configure relcache\n");
@@ -120,19 +149,12 @@ int main() {
   flush_cache();
   EnableRelCache(hpm_fd);
 
-
-  
-  
-  
-  
   toFile("optdtlB.out", B, DIMENSION);
-  
-  
-  start = std::chrono::high_resolution_clock::now();
-  matmult_dtl_transposed(A, B, C, DIMENSION);
-  end = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration<double>(end - start).count();
-  checksum = print_checksum(C, DIMENSION);
+  auto start = std::chrono::high_resolution_clock::now();
+  matmult_dtl_transposed(A, (float*)TO_RME(B), C, DIMENSION);
+  auto end = std::chrono::high_resolution_clock::now();
+  double elapsed = std::chrono::duration<double>(end - start).count();
+  double checksum = print_checksum(C, DIMENSION);
   toFile("optdtlA.out", A, DIMENSION);
   
   toFile("optdtl.out", C, DIMENSION);
@@ -145,6 +167,7 @@ int main() {
   free(A);
   // free(B);
   free(C);
+  */
 
   return 0;
 }
