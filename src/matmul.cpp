@@ -114,6 +114,7 @@ void init_data(float *A, float *B, float *C, int dimension)
     std::mt19937 rng(292); // fixed seed for reproducibility
     std::uniform_real_distribution<float> dist(-0.5f, 0.5f);
     for(i = 0; i < dimension; i++) {
+        printf("Initializing data %d\n", i);
         for(j = 0; j < dimension; j++) {
             A[dimension*i+j] = dist(rng);
             B[dimension*i+j] = dist(rng);

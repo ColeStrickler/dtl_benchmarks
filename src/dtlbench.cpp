@@ -45,19 +45,39 @@ void toFile_int(const std::string &file, int *res, int dimension) {
   }
   ofs.close();
 }
-int open_fd() {
-    int fd = open("/dev/mem", O_RDWR | O_SYNC);
-    if (fd == -1) {
-        printf("Can't open /dev/mem.\n");
-        exit(0);
-    }
-    return fd;
-}
+
 
 int main() {
   auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 5, 6, 4, 3, 1);
   auto api = new DTL::API(hwStat);
-  auto ephemeral = api->AllocEphemeralRegion(0x100000);
+  if (api->GetError() != 0)
+  {
+    printf("DTL::API::HASERROR\n");
+    return 0;
+  }
+
+
+
+  auto ephemeral = api->AllocEphemeralRegion(64*0x100000);
+  int alloc_size = DIMENSION * DIMENSION * sizeof(float);
+  float *A = (float *)malloc(alloc_size);
+  float* Bw = (float*)ephemeral->GetHeadlessWriteregion();
+  float* Br = (float*)ephemeral->GetHeadlessReadRegion();
+  float* Bt;
+  float* B = (float*)malloc(alloc_size);
+  float* C = (float*)malloc(alloc_size);
+
+  if (A == nullptr || B == nullptr || C == nullptr)
+  {
+    printf("0x%x, 0x%x, 0x%x", A, B, C);
+  }
+
+
+  BENCH(matmult_opt3_transposed(A, B, C, &Bt, DIMENSION));
+
+
+  init_data(A, Bw, C, DIMENSION);
+    double checksum = print_checksum(C, DIMENSION);
 
   if (!api->Compile(FileToString("./transpose_640x640.dtl"))) {
     printf("Failed to compile dtl program or map onto agu\n");
@@ -65,31 +85,74 @@ int main() {
   }
   api->ProgramHardware(ephemeral);
   printf("Successfully programmed agu\n");
+  matmult_dtl_transposed(A, Br, C, DIMENSION);
 
 
+for (int j = 0; j < 32; j++)
+{
+  printf("\n\nJ=%d\n\n", j);
 
-  // Access with bounds checking
-  uint8_t a = ephemeral->GuardedRead_8(0);
+
   ephemeral->GuardedWrite_8(0, 0x1);
+   printf("did write\n");
+  // Access with bounds checking
 
-  // move to new physical address so writes propagate
-  ephemeral->Sync();
-
+  for (int i = 0; i < 10000; i++)
+  {
+    uint8_t a = ephemeral->GuardedRead_8(0);
+    
+//
+  //// move to new physical address so writes propagate
+  //ephemeral->Sync();
+//
 
   // we shhould now get new data
   uint8_t b = ephemeral->GuardedRead_8(0);
-  printf("Check a %c, %c\n", a, b);
+  printf("Check a 0x%x, 0x%x\n", a, b);
+  }
+  
 
   // also allow headless acess if needed
   void* ephemeral_raw = ephemeral->GetHeadlessReadRegion();
 
 
+  
+
+  float p = 0.0f;
+  for (int i = 0; i < 100000; i++)
+  {
+      float x = 5423.0f / (i*i*i*i);
+      p += x / 3.0f;
+  }
+  printf("%.3f\n", p);
+
+ 
+    ephemeral->GuardedWrite_8(0, 0x2);
+    printf("did write\n");
+     ephemeral->Sync();
+  // Access with bounds checking
+
+  for (int i = 0; i < 10000; i++)
+  {
+    uint8_t a = ephemeral->GuardedRead_8(0);
+    
+//
+  //// move to new physical address so writes propagate
+  //ephemeral->Sync();
+//
+
+  // we shhould now get new data
+  uint8_t b = ephemeral->GuardedRead_8(0);
+  printf("Check a 0x%x, 0x%x\n", a, b);
+  }
   api->FreeEphemeralRegion(ephemeral);
+}
 
 
 
+  
 
-
+  // also 
 
 /*
   unsigned long *config = (unsigned long *)mmap(NULL,
@@ -114,7 +177,10 @@ int main() {
 
   int alloc_size = DIMENSION * DIMENSION * sizeof(float);
   float *A = (float *)malloc(alloc_size);
-  float *B = (float *)plim;
+  float *B = (float *)plim;[detached from 767305.fsim0]
+c674s876@avalugg:~/FIRESIM_RUNS_DIR/sim_slot_0$ cat uartlog |less
+c674s876@avalugg:~/FIRESIM_RUNS_DIR/sim_slot_0$ cat sy
+
   float *C = (float *)malloc(alloc_size);
   float *Bt;
 
