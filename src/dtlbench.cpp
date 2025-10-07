@@ -5,7 +5,7 @@
 #include "matmul.hpp"
 #include "util.hpp"
 
-#define DIMENSION 640
+#define DIMENSION 2048
 #define RME_SHIFT 0x8000000UL
 #define TO_RME(addr) (((uint64_t)addr) + RME_SHIFT)
 
@@ -72,81 +72,46 @@ int main() {
     printf("0x%x, 0x%x, 0x%x", A, B, C);
   }
 
-
+  
   BENCH(matmult_opt3_transposed(A, B, C, &Bt, DIMENSION));
 
 
-  init_data(A, Bw, C, DIMENSION);
-    double checksum = print_checksum(C, DIMENSION);
 
-  if (!api->Compile(FileToString("./transpose_640x640.dtl"))) {
+
+
+  init_data(A, Bw, C, DIMENSION);
+  if (!api->Compile(FileToString("./transpose_2048x2048.dtl"))) {
     printf("Failed to compile dtl program or map onto agu\n");
     return 0;
   }
   api->ProgramHardware(ephemeral);
   printf("Successfully programmed agu\n");
+
+  auto start = std::chrono::high_resolution_clock::now();
   matmult_dtl_transposed(A, Br, C, DIMENSION);
+  auto end = std::chrono::high_resolution_clock::now();
+  double elapsed = std::chrono::duration<double>(end - start).count();
+  double checksum = print_checksum(C, DIMENSION);
+  printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmult_dtl_transposed", elapsed, checksum);
 
-
-for (int j = 0; j < 32; j++)
-{
-  printf("\n\nJ=%d\n\n", j);
-
-
-  ephemeral->GuardedWrite_8(0, 0x1);
-   printf("did write\n");
-  // Access with bounds checking
-
-  for (int i = 0; i < 10000; i++)
-  {
-    uint8_t a = ephemeral->GuardedRead_8(0);
-    
-//
-  //// move to new physical address so writes propagate
-  //ephemeral->Sync();
-//
-
-  // we shhould now get new data
-  uint8_t b = ephemeral->GuardedRead_8(0);
-  printf("Check a 0x%x, 0x%x\n", a, b);
-  }
+  init_data(A, B, C, DIMENSION);
+  ephemeral->Sync();
   
-
-  // also allow headless acess if needed
-  void* ephemeral_raw = ephemeral->GetHeadlessReadRegion();
-
-
   
+  start = std::chrono::high_resolution_clock::now();
+  matmult_dtl_transposed(A, Br, C, DIMENSION);
+  end = std::chrono::high_resolution_clock::now();
+  elapsed = std::chrono::duration<double>(end - start).count();
+  checksum = print_checksum(C, DIMENSION);
+  printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmult_dtl_transposed", elapsed, checksum);
 
-  float p = 0.0f;
-  for (int i = 0; i < 100000; i++)
-  {
-      float x = 5423.0f / (i*i*i*i);
-      p += x / 3.0f;
-  }
-  printf("%.3f\n", p);
+  BENCH(matmult_opt1_jk(A, B, C, DIMENSION));
+  BENCH(matmult_opt2_jk_tiling(A, B, C, DIMENSION));
+  BENCH(matmult_opt0_naive(A, B, C, DIMENSION));
 
- 
-    ephemeral->GuardedWrite_8(0, 0x2);
-    printf("did write\n");
-     ephemeral->Sync();
-  // Access with bounds checking
 
-  for (int i = 0; i < 10000; i++)
-  {
-    uint8_t a = ephemeral->GuardedRead_8(0);
-    
-//
-  //// move to new physical address so writes propagate
-  //ephemeral->Sync();
-//
 
-  // we shhould now get new data
-  uint8_t b = ephemeral->GuardedRead_8(0);
-  printf("Check a 0x%x, 0x%x\n", a, b);
-  }
-  api->FreeEphemeralRegion(ephemeral);
-}
+
 
 
 
