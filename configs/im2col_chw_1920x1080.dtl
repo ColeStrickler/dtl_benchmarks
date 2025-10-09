@@ -1,0 +1,11 @@
+for (int c_im = 0; c_im < 3; ++c_im) {
+    for (int kh = 0; kh < 3; ++kh) {
+        for (int kw = 0; kw < 3; ++kw) {
+            for (int h = 0; h < 1078; ++h) {
+                for (int w = 0; w < 1918; ++w) {
+                    im2col[index++] = chw[c_im*(1080*1920) + (h + kh)*1920 + (w + kw)];
+                }
+            }
+        }
+    }
+}
