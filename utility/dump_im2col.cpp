@@ -63,8 +63,8 @@ float* GetBuf(const std::string& filename)
 
     return buf;
 }
-
-
+#define READ_FLOAT(addr)(*(float*)(addr))
+#include <cassert>
 int main() {
     unsigned int buf_size = 3*1078*3*3*1918;
     int H = 1080, W = 1920, C = 3;
@@ -74,12 +74,12 @@ int main() {
 
     float* outbuf = new float[buf_size];
     im2col_cpu(chw, 3, 1080, 1920, 3, 1, 0, outbuf);
-     std::ofstream out2("data/output_im2col_cc2.raw", std::ios::binary);
+    std::ofstream out2("data/output_im2col_cc2.raw", std::ios::binary);
     if (!out2) {
         std::cerr << "Failed to open file\n";
         return 1;
     }
-    out2.write(reinterpret_cast<char*>(outbuf), buf_size);
+    out2.write(reinterpret_cast<char*>(outbuf), buf_size*sizeof(float));
     out2.close();
 
 
@@ -111,16 +111,20 @@ int main() {
     //    }
     //}
 
-    for (int c_im = 0; c_im < 3; ++c_im) {
-        for (int kh = 0; kh < 3; ++kh) {
-            for (int kw = 0; kw < 3; ++kw) {
-                for (int h = 0; h < 1078; ++h) {
-                    for (int w = 0; w < 1918; ++w) {
-                        int im_row = h + kh;
-                        int im_col = w + kw;
+    for (unsigned int c_im = 0; c_im < 3; ++c_im) {
+        for (unsigned int kh = 0; kh < 3; ++kh) {
+            for (unsigned int kw = 0; kw < 3; ++kw) {
+                for (unsigned int h = 0; h < 1078; ++h) {
+                    for (unsigned int w = 0; w < 1918; ++w) {
+                        unsigned int im_row = h + kh;
+                        unsigned int im_col = w + kw;
                         // Check bounds for padding (pad=0, so ensure valid indices)
- 
-                            im2col[index++] = chw[c_im*(1080*1920) + im_row*1920 + im_col];
+                            unsigned int byte_offset =   c_im*(8294400) + (h + kh)*7680 + 4*(w + kw);
+                            unsigned int byte_offset2 = (c_im * (1080 * 1920) + im_row * 1920 + im_col) * 4;
+                            if (byte_offset != byte_offset2)
+                                printf("0x%x, 0x%x\n %d,%d,%d,%d,%d\n", byte_offset, byte_offset2, c_im, kh, kw, h, w);
+                            assert(byte_offset == byte_offset2);
+                            im2col[index++] =  (float)READ_FLOAT((uint64_t)chw + byte_offset);//chw[c_im*(1080*1920) + im_row*1920 + im_col];
                         
                     }
                 }
@@ -137,7 +141,7 @@ int main() {
     }
 
     // Write buffer
-    out.write(reinterpret_cast<char*>(im2col), buf_size);
+    out.write(reinterpret_cast<char*>(im2col), buf_size*sizeof(float));
     out.close();
 
     return 0;

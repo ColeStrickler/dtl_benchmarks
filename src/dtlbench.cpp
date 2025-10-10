@@ -4,7 +4,7 @@
 // User Headers
 #include "matmul.hpp"
 #include "util.hpp"
-
+#include "im2col.hpp"
 #define DIMENSION 2048
 #define RME_SHIFT 0x8000000UL
 #define TO_RME(addr) (((uint64_t)addr) + RME_SHIFT)
@@ -55,59 +55,84 @@ int main() {
     printf("DTL::API::HASERROR\n");
     return 0;
   }
+  auto ephemeral = api->AllocEphemeralRegion(0x10000000ULL);
+  //int alloc_size = DIMENSION * DIMENSION * sizeof(float);
+  //float *A = (float *)malloc(alloc_size);
+  float* ew = (float*)ephemeral->GetHeadlessWriteregion();
+  float* er = (float*)ephemeral->GetHeadlessReadRegion();
 
 
+  int H = 1080, W = 1920, C = 3;
+  auto chw_img_buf = GetImageBuf("./image_chw.raw");
+  memcpy(ew, chw_img_buf, H*W*C*sizeof(float));
+  
+  assert(chw_img_buf != nullptr);
 
-  auto ephemeral = api->AllocEphemeralRegion(64*0x100000);
-  int alloc_size = DIMENSION * DIMENSION * sizeof(float);
-  float *A = (float *)malloc(alloc_size);
-  float* Bw = (float*)ephemeral->GetHeadlessWriteregion();
-  float* Br = (float*)ephemeral->GetHeadlessReadRegion();
-  float* Bt;
-  float* B = (float*)malloc(alloc_size);
-  float* C = (float*)malloc(alloc_size);
+  // im2col output = 53MB for 1920x1080
+  unsigned int buf_size = 3*1078*3*3*1918;
+  float* outbuf = new float[buf_size];
+ 
+  auto start = std::chrono::high_resolution_clock::now();
+  im2col_cpu(chw_img_buf, 3, 1080, 1920, 3, 1, 0, outbuf);
+  auto end = std::chrono::high_resolution_clock::now();
+  double elapsed = std::chrono::duration<double>(end - start).count();
+  printf("%.12s  secs: %.6f\n", "im2col_cpu", elapsed);
+  dump_buffer_to_disk("im2col_cpu.out", (unsigned char*)outbuf, buf_size*sizeof(float));
+  delete outbuf;
 
-  if (A == nullptr || B == nullptr || C == nullptr)
-  {
-    printf("0x%x, 0x%x, 0x%x", A, B, C);
-  }
 
   
-  BENCH(matmult_opt3_transposed(A, B, C, &Bt, DIMENSION));
+  //float* Bt;
+  //float* B = (float*)malloc(alloc_size);
+  //float* C = (float*)malloc(alloc_size);
+  //if (A == nullptr || B == nullptr || C == nullptr)
+  //{
+  //  printf("0x%x, 0x%x, 0x%x", A, B, C);
+  //}
+  //
+  //
+  //BENCH(matmult_opt3_transposed(A, B, C, &Bt, DIMENSION));
+
+  
+  //init_data(A, Bw, C, DIMENSION);
 
 
-
-
-
-  init_data(A, Bw, C, DIMENSION);
-  if (!api->Compile(FileToString("./transpose_2048x2048.dtl"))) {
+  if (!api->Compile(FileToString("./im2col_chw_1920x1080.dtl"))) {
     printf("Failed to compile dtl program or map onto agu\n");
     return 0;
   }
   api->ProgramHardware(ephemeral);
   printf("Successfully programmed agu\n");
+  float* outbuf2 = new float[buf_size];
+  for (int i = 0; i < buf_size; i++)
+    outbuf2[i] = er[i];
 
-  auto start = std::chrono::high_resolution_clock::now();
-  matmult_dtl_transposed(A, Br, C, DIMENSION);
-  auto end = std::chrono::high_resolution_clock::now();
-  double elapsed = std::chrono::duration<double>(end - start).count();
-  double checksum = print_checksum(C, DIMENSION);
-  printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmult_dtl_transposed", elapsed, checksum);
 
-  init_data(A, B, C, DIMENSION);
-  ephemeral->Sync();
-  
-  
-  start = std::chrono::high_resolution_clock::now();
-  matmult_dtl_transposed(A, Br, C, DIMENSION);
-  end = std::chrono::high_resolution_clock::now();
-  elapsed = std::chrono::duration<double>(end - start).count();
-  checksum = print_checksum(C, DIMENSION);
-  printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmult_dtl_transposed", elapsed, checksum);
 
-  BENCH(matmult_opt1_jk(A, B, C, DIMENSION));
-  BENCH(matmult_opt2_jk_tiling(A, B, C, DIMENSION));
-  BENCH(matmult_opt0_naive(A, B, C, DIMENSION));
+ // memcpy(outbuf2, er, buf_size*sizeof(float));
+  dump_buffer_to_disk("im2col_dtu.out", (unsigned char*)outbuf2, buf_size*sizeof(float));
+
+
+
+
+  //auto start = std::chrono::high_resolution_clock::now();
+  //matmult_dtl_transposed(A, Br, C, DIMENSION);
+  //auto end = std::chrono::high_resolution_clock::now();
+  //double elapsed = std::chrono::duration<double>(end - start).count();
+  //double checksum = print_checksum(C, DIMENSION);
+  //printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmult_dtl_transposed", elapsed, checksum);
+
+  //init_data(A, B, C, DIMENSION);
+  //ephemeral->Sync();
+  //start = std::chrono::high_resolution_clock::now();
+  //matmult_dtl_transposed(A, Br, C, DIMENSION);
+  //end = std::chrono::high_resolution_clock::now();
+  //elapsed = std::chrono::duration<double>(end - start).count();
+  //checksum = print_checksum(C, DIMENSION);
+  //printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmult_dtl_transposed", elapsed, checksum);
+  //BENCH(matmult_opt1_jk(A, B, C, DIMENSION));
+  //BENCH(matmult_opt2_jk_tiling(A, B, C, DIMENSION));
+  //BENCH(matmult_opt0_naive(A, B, C, DIMENSION));
 
 
 

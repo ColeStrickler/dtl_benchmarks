@@ -46,7 +46,7 @@ int EnableRelCache(int fd);
 int reset_relcache(unsigned int frame_offset);
 
 std::string FileToString(const std::string &file_);
-
+int dump_buffer_to_disk(const std::string& outfile, unsigned char* outbuf, unsigned int buf_size);
 int configure_relcache();
 volatile void flush_cache();
 

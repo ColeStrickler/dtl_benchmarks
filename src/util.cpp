@@ -18,6 +18,19 @@ std::string FileToString(const std::string& file_)
 }
 
 
+int dump_buffer_to_disk(const std::string& outfile, unsigned char* outbuf, unsigned int buf_size)
+{
+    std::ofstream out2(outfile, std::ios::binary);
+    if (!out2) {
+        std::cerr << "Failed to open file\n";
+        return 1;
+    }
+    out2.write(reinterpret_cast<char*>(outbuf), buf_size);
+    out2.close();
+
+    return 0;
+}
+
 
 
 int open_fd() {

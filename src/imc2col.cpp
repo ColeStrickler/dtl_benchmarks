@@ -31,6 +31,7 @@ void im2col_cpu(float* data_im,
                 int im_row = h_offset + h * stride;
                 int im_col = w_offset + w * stride;
                 int col_index = (c * height_col + h) * width_col + w;
+                //printf("%d = %d\n", col_index, im_col + width*(im_row + height*c_im));
                 data_col[col_index] = im2col_get_pixel(data_im, height, width, channels,
                         im_row, im_col, c_im, pad);
             }
@@ -39,3 +40,22 @@ void im2col_cpu(float* data_im,
 }
 
 
+float* GetImageBuf(const std::string& filename)
+{
+    int H = 1080, W = 1920, C = 3;
+
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        std::cerr << "Failed to open file\n";
+        return nullptr;
+    }
+
+    float* buf = new float[H*W*C];
+    file.read((char*)buf, H*W*C*sizeof(float));
+    if (!file) {
+        std::cerr << "Failed to read full file\n";
+        return nullptr;
+    }
+
+    return buf;
+}
