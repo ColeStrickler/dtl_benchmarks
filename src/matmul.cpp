@@ -211,6 +211,35 @@ void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
     }
 }   
 
+/*
+    This matches benchmark tile_tme
+*/
+void matmult_dtl_transposed_tile(size_t size, size_t tile_size, size_t inner_tile_size, float* a, float*  b, float*  c) {
+  // Perform the matrix multiplication with double nested tiling
+  for (size_t ii = 0; ii < size; ii += tile_size) {
+    for (size_t jj = 0; jj < size; jj += tile_size) {
+      for (size_t kk = 0; kk < size; kk += tile_size) {
+        // Handle each block
+        for (size_t iii = ii; iii < ii+tile_size && iii < size; iii += inner_tile_size) {
+          for (size_t jjj = jj; jjj < jj+tile_size && jjj < size; jjj += inner_tile_size) {
+            for (size_t kkk = kk; kkk < kk+tile_size && kkk < size; kkk += inner_tile_size) {
+              // Handle each sub-block
+              for (size_t i = iii; i < iii+inner_tile_size && i < size; i++) {
+                for (size_t j = jjj; j < jjj+inner_tile_size && i < size; j++) {
+                  for (size_t k = kkk; k < kkk+inner_tile_size && k < size; k++) {
+                    c[i*size+j] += a[i*size+k]*b[j*size+k];
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+
 
 // transpose matrix
 void transpose_naive(float *src, float *dst, int src_row, int src_col)
@@ -336,4 +365,206 @@ void matmult_dtl_transposed_int(int *A, int *B, int *C, int dimension)
         }
     }
    // free(Bt);
+}
+
+
+
+
+void mat_add(TYPE* a, TYPE*  b, TYPE* c, size_t size) {
+	for (size_t i = 0; i < size*size; i++)
+        c[i] = a[i]+b[i];
+}
+
+void matmul_opt4_recursive(TYPE*  a, TYPE*  b, TYPE* c, const size_t size, size_t threshold) {
+    
+  if (size == THRESHOLD) {
+	  // matrix C must be zeroed because the tiled multiplication cannot do it inside the loops (unlike the naive approach	
+    memset(c, 0, size*size*sizeof(TYPE));
+    for (size_t i = 0; i < size; i++) {
+      for (size_t j = 0; j < size; j++) {
+        for (size_t k = 0; k < size; k++) {
+          c[i*size+j] += a[i*size+k]*b[k*size+j];
+        }
+      }
+    }
+  }
+  else {
+    // Shrink the size by a factor of 2
+    int new_size = size/2;
+
+    int res = 0;
+    // Allocate the buffers to store the submatrices (i.e., a, b, c, d, e, f, g, and h)
+    TYPE** submatrices = (TYPE**)malloc(8*sizeof(TYPE*));
+    for (size_t i = 0; i < 8; i++) {
+      res = posix_memalign((void**)&submatrices[i], NEON_ALIGNMENT, (new_size*new_size*sizeof(TYPE)));
+      if (res != 0)
+        printf("An error occured when using 'posix_memalign'\n");
+    }
+
+    TYPE** intermediate_result = (TYPE**)malloc(2*sizeof(TYPE*));
+    for (int i = 0; i < 2; i++) { 
+      res = posix_memalign((void**)&intermediate_result[i], NEON_ALIGNMENT, new_size*new_size*sizeof(TYPE));
+      if (res != 0)
+        printf("An error occured when using 'posix_memalign'\n");
+    }
+
+    TYPE** result = (TYPE**)malloc(4*sizeof(TYPE*));
+    for (int i = 0; i < 4; i++) { 
+      res = posix_memalign((void**)&result[i], NEON_ALIGNMENT, new_size*new_size*sizeof(TYPE));
+      if (res != 0)
+        printf("An error occured when using 'posix_memalign'\n");
+    }
+
+    // Divide the matrices into 4 submatrices and call multiply recursively
+    for (size_t i = 0; i < new_size; i++) {
+      for (size_t j = 0; j < new_size; j++) {
+        // Computing submatrices
+        submatrices[0][i*new_size+j] = a[(i*size)+j];                       // A00 (A)
+        submatrices[1][i*new_size+j] = a[(i*size)+(j+new_size)];            // A01 (B)
+        submatrices[2][i*new_size+j] = a[((i+new_size)*size)+j];            // A10 (C)
+        submatrices[3][i*new_size+j] = a[((i+new_size)*size)+(j+new_size)]; // A11 (D)
+        submatrices[4][i*new_size+j] = b[(i*size)+j];                       // B00 (E)
+        submatrices[5][i*new_size+j] = b[(i*size)+(j+new_size)];            // B01 (F)
+        submatrices[6][i*new_size+j] = b[((i+new_size)*size)+j];            // B10 (G)
+        submatrices[7][i*new_size+j] = b[((i+new_size)*size)+(j+new_size)]; // B11 (H)
+      }
+    }
+
+    // Compute each submatrix of matrix c
+    // C11
+    matmul_opt4_recursive(submatrices[0], submatrices[4], intermediate_result[0], new_size, THRESHOLD); // AE
+    matmul_opt4_recursive(submatrices[1], submatrices[6], intermediate_result[1], new_size, THRESHOLD); // BG
+    mat_add(intermediate_result[0], intermediate_result[1], result[0], new_size);   // AE+BG
+    // C12
+    matmul_opt4_recursive(submatrices[0], submatrices[5], intermediate_result[0], new_size, THRESHOLD); // AF
+    matmul_opt4_recursive(submatrices[1], submatrices[7], intermediate_result[1], new_size, THRESHOLD); // BH
+    mat_add(intermediate_result[0], intermediate_result[1], result[1], new_size);   // AF+BH
+    // C21
+    matmul_opt4_recursive(submatrices[2], submatrices[4], intermediate_result[0], new_size, THRESHOLD); // CE
+    matmul_opt4_recursive(submatrices[3], submatrices[6], intermediate_result[1], new_size, THRESHOLD); // DG
+    mat_add(intermediate_result[0], intermediate_result[1], result[2], new_size);   // CE+DG
+    // C22
+    matmul_opt4_recursive(submatrices[2], submatrices[5], intermediate_result[0], new_size, THRESHOLD); // CF
+    matmul_opt4_recursive(submatrices[3], submatrices[7], intermediate_result[1], new_size, THRESHOLD); // DH
+    mat_add(intermediate_result[0], intermediate_result[1], result[3], new_size);   // CF+DH
+
+    // Inserts results in matrix c
+    for (size_t i = 0; i < new_size; i++) {
+      for (size_t j = 0; j < new_size; j++) { 
+        c[(i*size)+j]                       = result[0][i*new_size+j]; // C00 (AE+BG)
+        c[(i*size)+(j+new_size)]            = result[1][i*new_size+j]; // C01 (AF+BH)
+        c[((i+new_size)*size)+j]            = result[2][i*new_size+j]; // C10 (CE+DG)
+        c[((i+new_size)*size)+(j+new_size)] = result[3][i*new_size+j]; // C11 (CF+DH)
+      }
+    }
+
+    // Free temporary matrices
+    for (int i = 0; i < 8; i++)
+      free(submatrices[i]);
+    free(submatrices);
+    for (int i = 0; i < 4; i++)
+      free(result[i]);
+    free(result);
+    for (int i = 0; i < 2; i++)
+      free(intermediate_result[i]);
+    free(intermediate_result);
+  }
+}
+
+
+
+void matmul_opt5_recursive_pretranspose(TYPE* a, TYPE*  b, TYPE* c, size_t size, size_t threshold) {
+  if (size == THRESHOLD) {
+	  // Matrix C must be zeroed because the tiled multiplication cannot do it inside the loops (unlike the naive approach	
+    memset(c, 0, size*size*sizeof(TYPE));
+    //
+    for (size_t i = 0; i < size; i++) {
+      for (size_t j = 0; j < size; j++) {
+        for (size_t k = 0; k < size; k++) {
+          c[i*size+j] += a[i*size+k]*b[j*size+k];
+        }
+      }
+    }
+  }
+  else {
+    // Shrink the size by a factor of 2
+    uint32_t new_size = size/2;
+
+    int res = 0;
+    // Allocate the buffers to store the submatrices (i.e., a, b, c, d, e, f, g, and h)
+    TYPE** submatrices = (TYPE**)malloc(8*sizeof(TYPE*));
+    for (size_t i = 0; i < 8; i++) {
+      res = posix_memalign((void**)&submatrices[i], NEON_ALIGNMENT, (new_size*new_size*sizeof(TYPE)));
+      if (res != 0)
+        printf("An error occured when using 'posix_memalign'\n");
+    }
+
+    TYPE** intermediate_result = (TYPE**)malloc(2*sizeof(TYPE*));
+    for (int i = 0; i < 2; i++) { 
+      res = posix_memalign((void**)&intermediate_result[i], NEON_ALIGNMENT, new_size*new_size*sizeof(TYPE));
+      if (res != 0)
+        printf("An error occured when using 'posix_memalign'\n");
+    }
+
+    TYPE** result = (TYPE**)malloc(4*sizeof(TYPE*));
+    for (int i = 0; i < 4; i++) { 
+      res = posix_memalign((void**)&result[i], NEON_ALIGNMENT, new_size*new_size*sizeof(TYPE));
+      if (res != 0)
+        printf("An error occured when using 'posix_memalign'\n");
+    }
+
+    // Divide the matrices into 4 submatrices and call multiply recursively
+    for (size_t i = 0; i < new_size; i++) {
+      for (size_t j = 0; j < new_size; j++) {
+        // Computing submatrices
+        submatrices[0][i*new_size+j] = a[(i*size)+j];                       // A00 (A)
+        submatrices[1][i*new_size+j] = a[(i*size)+(j+new_size)];            // A01 (B)
+        submatrices[2][i*new_size+j] = a[((i+new_size)*size)+j];            // A10 (C)
+        submatrices[3][i*new_size+j] = a[((i+new_size)*size)+(j+new_size)]; // A11 (D)
+        submatrices[4][i*new_size+j] = b[(i*size)+j];                       // B00 (E)
+        submatrices[5][i*new_size+j] = b[(i*size)+(j+new_size)];            // B01 (F)
+        submatrices[6][i*new_size+j] = b[((i+new_size)*size)+j];            // B10 (G)
+        submatrices[7][i*new_size+j] = b[((i+new_size)*size)+(j+new_size)]; // B11 (H)
+      }
+    }
+
+    // Compute each submatrix of matrix c
+    // C11
+    matmul_opt5_recursive_pretranspose(submatrices[0], submatrices[4], intermediate_result[0], new_size, THRESHOLD); // AE
+    matmul_opt5_recursive_pretranspose(submatrices[1], submatrices[5], intermediate_result[1], new_size, THRESHOLD); // BF
+    mat_add(intermediate_result[0], intermediate_result[1], result[0], new_size);   // AE+BF
+    // C12
+    matmul_opt5_recursive_pretranspose(submatrices[0], submatrices[6], intermediate_result[0], new_size, THRESHOLD); // AG
+    matmul_opt5_recursive_pretranspose(submatrices[1], submatrices[7], intermediate_result[1], new_size, THRESHOLD); // BH
+    mat_add(intermediate_result[0], intermediate_result[1], result[1], new_size);   // AG+BH
+    // C21
+    matmul_opt5_recursive_pretranspose(submatrices[2], submatrices[4], intermediate_result[0], new_size, THRESHOLD); // CE
+    matmul_opt5_recursive_pretranspose(submatrices[3], submatrices[5], intermediate_result[1], new_size, THRESHOLD); // DF
+    mat_add(intermediate_result[0], intermediate_result[1], result[2], new_size);   // CE+DF
+    // C22
+    matmul_opt5_recursive_pretranspose(submatrices[2], submatrices[6], intermediate_result[0], new_size, THRESHOLD); // CG
+    matmul_opt5_recursive_pretranspose(submatrices[3], submatrices[7], intermediate_result[1], new_size, THRESHOLD); // DH
+    mat_add(intermediate_result[0], intermediate_result[1], result[3], new_size);   // CG+DH
+
+    // Inserts results in matrix c
+    for (size_t i = 0; i < new_size; i++) {
+      for (size_t j = 0; j < new_size; j++) { 
+        c[(i*size)+j]                       = result[0][i*new_size+j]; // C11 (AE+BF)
+        c[(i*size)+(j+new_size)]            = result[1][i*new_size+j]; // C12 (AG+BH)
+        c[((i+new_size)*size)+j]            = result[2][i*new_size+j]; // C21 (CE+DF)
+        c[((i+new_size)*size)+(j+new_size)] = result[3][i*new_size+j]; // C22 (CG+DH)
+      }
+    }
+
+    // Free temporary matrices
+    for (int i = 0; i < 8; i++)
+      free(submatrices[i]);
+    free(submatrices);
+    for (int i = 0; i < 4; i++)
+      free(result[i]);
+    free(result);
+    for (int i = 0; i < 2; i++)
+      free(intermediate_result[i]);
+    free(intermediate_result);
+  }
 }
