@@ -114,7 +114,7 @@ void init_data(float *A, float *B, float *C, int dimension)
     std::mt19937 rng(292); // fixed seed for reproducibility
     std::uniform_real_distribution<float> dist(-0.5f, 0.5f);
     for(i = 0; i < dimension; i++) {
-        printf("Initializing data %d\n", i);
+        //printf("Initializing data %d\n", i);
         for(j = 0; j < dimension; j++) {
             A[dimension*i+j] = dist(rng);
             B[dimension*i+j] = dist(rng);
@@ -122,6 +122,7 @@ void init_data(float *A, float *B, float *C, int dimension)
             //printf("%f %f\n", A[dimension*i+j], B[dimension*i+j]);
         }
     }
+    printf("Data successfully initialized.\n");
 }
 
 
@@ -273,7 +274,7 @@ void matmult_opt3_transposed(float *A, float *B, float *C, float** Bt, int dimen
 
     float * bt = *Bt;
     transpose_naive(B, bt, dimension, dimension);
-
+    //printf("dimension %d\n", dimension);
     for(i = 0; i < dimension; i++) {
         for(j = 0; j < dimension; j++) {
             for(k = 0; k < dimension; k++) {                            
