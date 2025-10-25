@@ -14,7 +14,7 @@
 
 
 
-#define DIMENSION 2048
+#define DIMENSION 640
 #define RME_SHIFT 0x8000000UL
 #define TO_RME(addr) (((uint64_t)addr) + RME_SHIFT)
 
@@ -65,7 +65,7 @@ void matrix_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
   float* ew = (float*)ephemeral->GetHeadlessWriteregion();
   float* er = (float*)ephemeral->GetHeadlessReadRegion();
 
-  if (!api->Compile(FileToString("./configs/transpose_2048x2048.dtl"))) {
+  if (!api->Compile(FileToString("./configs/transpose_640x640.dtl"))) {
     printf("Failed to compile dtl program or map onto agu\n");
     return;
   }
@@ -137,6 +137,7 @@ void matrix_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
 
       init_data(A, ew, C, DIMENSION);
       start = std::chrono::high_resolution_clock::now();
+      matmul_opt5_recursive_pretranspose(A, er, C, DIMENSION, 64);
       end = std::chrono::high_resolution_clock::now();
       elapsed = std::chrono::duration<double>(end - start).count();
       checksum = print_checksum(C, DIMENSION);
@@ -152,7 +153,7 @@ void matrix_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
       auto bT = (float*)malloc(alloc_size);
       transpose_naive(B, bT, DIMENSION, DIMENSION);
       auto start = std::chrono::high_resolution_clock::now();
-      matmul_opt5_recursive_pretranspose(A, bT, C, DIMENSION, 64);
+      matmult_dtl_transposed_tile(DIMENSION, 512, 32, A, bT, C);
       auto end = std::chrono::high_resolution_clock::now();
       double elapsed = std::chrono::duration<double>(end - start).count();
       double checksum = print_checksum(C, DIMENSION);
@@ -226,13 +227,17 @@ void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
 
 int main(int argc, char* argv[]) {
   auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 5, 6, 4, 3, 1);
+  hwStat->nMaxConfigs = 2;
+
+
   auto api = new DTL::API(hwStat);
   if (api->GetError() != 0)
   {
     printf("DTL::API::HASERROR\n");
     return 0;
   }
-  auto ephemeral = api->AllocEphemeralRegion(0x10000000ULL);
+  auto ephemeral = api->AllocEphemeralRegion(0x1000000ULL);
+  auto ephemeral2 = api->AllocEphemeralRegion(0x1000000ULL);
   //int alloc_size = DIMENSION * DIMENSION * sizeof(float);
   //float *A = (float *)malloc(alloc_size);
   
@@ -267,6 +272,31 @@ int main(int argc, char* argv[]) {
   {
       assert(argc == 3);
       int benchmark = std::stoi(argv[2]);
+      matrix_benchmark(benchmark, ephemeral2, api);
+  }
+  else if (strcmp(argv[1], "--im2col") == 0)
+  {
+    assert(argc == 3);
+    int benchmark = std::stoi(argv[2]);
+    im2col_benchmark(benchmark, ephemeral2, api);
+  }
+  else if (strcmp(argv[1], "--db") == 0)
+  {
+    printf("no db benchmark implemented yet.\n");
+  }
+  else
+  {
+    printf("Usage: ./dtlbench --[matrix, im2col, db] <benchmark>\n");
+    return 0;
+  }
+  
+
+
+
+  if (strcmp(argv[1], "--matrix") == 0)
+  {
+      assert(argc == 3);
+      int benchmark = std::stoi(argv[2]);
       matrix_benchmark(benchmark, ephemeral, api);
   }
   else if (strcmp(argv[1], "--im2col") == 0)
@@ -284,7 +314,6 @@ int main(int argc, char* argv[]) {
     printf("Usage: ./dtlbench --[matrix, im2col, db] <benchmark>\n");
     return 0;
   }
-  
 
 
 
