@@ -223,6 +223,140 @@ void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
 }
 
 
+#define DEFAULT_ROW_COUNT 43690
+#define DEFAULT_COL_SIZE 4
+void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, DTL::API* api)
+{
+  std::string dtl_bench_config = "database_row" + std::to_string(row_size) + "_" + std::to_string(3) + "col.dtl";
+  std::string config_file = "./configs/" + dtl_bench_config;
+  printf("Running Database Benchmark for row_size=%d, col_count=%d\n", row_size, col_count);
+  uint32_t* db = new uint32_t[(row_size/DEFAULT_COL_SIZE)*DEFAULT_ROW_COUNT];
+  
+  uint32_t* ew = (uint32_t*)ephemeral->GetHeadlessWriteregion();
+  uint32_t* er = (uint32_t*)ephemeral->GetHeadlessReadRegion();
+
+
+  /*
+    Initialize data
+  */
+  std::mt19937 rng(292); // fixed seed for reproducibility
+  std::uniform_int_distribution<int> dist(-50,50);
+  for (int i = 0; i < (row_size/DEFAULT_COL_SIZE)*DEFAULT_ROW_COUNT; i++)
+    db[i] = dist(rng);
+  memcpy(ew, db, (row_size/DEFAULT_COL_SIZE)*DEFAULT_ROW_COUNT*sizeof(uint32_t));
+
+
+  int* col_offsets;
+
+
+
+  switch (row_size)
+  {
+      case 64:
+      {
+        switch(col_count)
+        {
+          case 3:
+          {
+            col_offsets = new int[3];
+            int col_offsetsx[] = {4, 32, 48};
+            memcpy(col_offsets, col_offsetsx, sizeof(int)*3);
+            break;           
+          }
+          case 11:
+          {
+            col_offsets = new int[11];
+            int col_offsetsx[] = {4, 8, 16, 24, 28, 32, 40, 48, 52, 56, 60};
+            memcpy(col_offsets, col_offsetsx, sizeof(int)*11);
+            break;    
+          }
+          default:
+          {
+            printf("Invalid col_count. valids=(3, 11)\n");
+           return;
+          }
+          
+        }
+        break;
+      }
+      case 512:
+      {
+        switch(col_count)
+        {
+          case 3:
+          {
+            col_offsets = new int[3];
+            int col_offsetsx[] = {508, 1016, 1804};
+            memcpy(col_offsets, col_offsetsx, sizeof(int)*3);
+          }
+          case 11:
+          {
+            col_offsets = new int[11];
+            int col_offsetsx[] = {4, 32, 256, 508, 680, 880, 1016, 1400, 1804, 2000, 2024};
+            memcpy(col_offsets, col_offsetsx, sizeof(int)*11);
+          }
+          default:
+          {
+            printf("Invalid col_count. valids=(3, 11)\n");
+            return;
+          }
+        }
+        break;
+      }
+      default:
+      {
+        printf("Invalid row size. valids=(64, 512)\n");
+        return;
+      }
+  }
+
+
+
+  uint32_t checksum = 0;
+  uint32_t* out_array = new uint32_t[DEFAULT_ROW_COUNT*col_count];
+  uint32_t out_write_index = 0;
+  memset(out_array, 0x00, DEFAULT_ROW_COUNT*col_count*sizeof(uint32_t));
+  auto start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < DEFAULT_ROW_COUNT; i++)
+  {
+    for (int j = 0; j < col_count; col_count++)
+    {
+        out_array[out_write_index++] = READ_UINT32(((uint64_t)db) + i*row_size + col_offsets[j]);
+    }
+  }
+  auto end = std::chrono::high_resolution_clock::now();
+  double elapsed = std::chrono::duration<double>(end - start).count();
+  // get checksum
+  for (int x = 0; x < col_count*DEFAULT_ROW_COUNT; x++)
+    checksum += out_array[x];
+  printf("%.12s  secs: %.6f, chsum: %ld\n", dtl_bench_config.c_str(), elapsed, checksum);
+  delete out_array;
+
+  /*
+    Now through DTU
+  */
+  checksum = 0;
+  uint32_t* out_array2 = new uint32_t[DEFAULT_ROW_COUNT*col_count];
+  uint32_t out_write_index2 = 0;
+  memset(out_array2, 0x00, DEFAULT_ROW_COUNT*col_count*sizeof(uint32_t));
+  start = std::chrono::high_resolution_clock::now();
+  uint32_t row_span_dtu = col_count*DEFAULT_COL_SIZE;
+  for (int i = 0; i < DEFAULT_ROW_COUNT; i++)
+  {
+    for (int j = 0; j < col_count; col_count++)
+    {
+        out_array2[out_write_index2++] = READ_UINT32(((uint64_t)er) + i*row_span_dtu + j*DEFAULT_COL_SIZE);
+    }
+  }
+  end = std::chrono::high_resolution_clock::now();
+  elapsed = std::chrono::duration<double>(end - start).count();
+  // get checksum
+  for (int x = 0; x < col_count*DEFAULT_ROW_COUNT; x++)
+    checksum += out_array2[x];
+  printf("dtu_%.12s  secs: %.6f, chsum: %ld\n", dtl_bench_config.c_str(), elapsed, checksum);
+  delete col_offsets;
+}
+
 
 
 int main(int argc, char* argv[]) {
@@ -236,78 +370,39 @@ int main(int argc, char* argv[]) {
     printf("DTL::API::HASERROR\n");
     return 0;
   }
-  auto ephemeral = api->AllocEphemeralRegion(0x1000000ULL);
-  auto ephemeral2 = api->AllocEphemeralRegion(0x1000000ULL);
-  //int alloc_size = DIMENSION * DIMENSION * sizeof(float);
-  //float *A = (float *)malloc(alloc_size);
-  
-  
-  // im2col output = 53MB for 1920x1080
-  
-
-
-  
-  //float* Bt;
-  //float* B = (float*)malloc(alloc_size);
-  //float* C = (float*)malloc(alloc_size);
-  //if (A == nullptr || B == nullptr || C == nullptr)
-  //{
-  //  printf("0x%x, 0x%x, 0x%x", A, B, C);
-  //}
-  //
-  //
-  //BENCH(matmult_opt3_transposed(A, B, C, &Bt, DIMENSION));
-
-  
-  //init_data(A, Bw, C, DIMENSION);
-
-
- 
-
-
-
-
-  assert(argc > 1);
-  if (strcmp(argv[1], "--matrix") == 0)
-  {
-      assert(argc == 3);
-      int benchmark = std::stoi(argv[2]);
-      matrix_benchmark(benchmark, ephemeral2, api);
-  }
-  else if (strcmp(argv[1], "--im2col") == 0)
-  {
-    assert(argc == 3);
-    int benchmark = std::stoi(argv[2]);
-    im2col_benchmark(benchmark, ephemeral2, api);
-  }
-  else if (strcmp(argv[1], "--db") == 0)
-  {
-    printf("no db benchmark implemented yet.\n");
-  }
-  else
-  {
-    printf("Usage: ./dtlbench --[matrix, im2col, db] <benchmark>\n");
-    return 0;
-  }
-  
-
+  auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
+  //auto ephemeral2 = api->AllocEphemeralRegion(0x8000000ULL);
 
 
   if (strcmp(argv[1], "--matrix") == 0)
   {
+    auto ephemeral = api->AllocEphemeralRegion(0x1000000ULL);
       assert(argc == 3);
       int benchmark = std::stoi(argv[2]);
       matrix_benchmark(benchmark, ephemeral, api);
   }
   else if (strcmp(argv[1], "--im2col") == 0)
   {
+    auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
     assert(argc == 3);
     int benchmark = std::stoi(argv[2]);
     im2col_benchmark(benchmark, ephemeral, api);
   }
   else if (strcmp(argv[1], "--db") == 0)
   {
-    printf("no db benchmark implemented yet.\n");
+    auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
+    assert(argc == 4);
+    int row_size = std::stoi(argv[2]);
+    int col_count = std::stoi(argv[3]);
+    db_benchmark(row_size, col_count, ephemeral, api);
+  }
+  else if (strcmp(argv[1], "--multi") == 0) // multithreaded
+  {
+    // want to be able to run different number of threads on different configs or same config
+    //auto ephemeral = api->AllocEphemeralRegion(0x1000000ULL);
+    //auto ephemeral2 = api->AllocEphemeralRegion(0x1000000ULL);
+
+
   }
   else
   {

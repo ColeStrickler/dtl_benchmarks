@@ -6,7 +6,7 @@ rows = 512
 cols = 512
 
 # Load raw float32 bytes
-img = np.fromfile("data/cat_gaussian.raw", dtype=np.float32)
+img = np.fromfile("data/cat_gaussian_notme.raw", dtype=np.float32)
 img = img.reshape((rows, cols))
 
 # If you normalized before saving, values are in [0, 1]
