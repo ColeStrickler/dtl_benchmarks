@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <thread>
 
 // User Headers
 #include "matmul.hpp"
@@ -170,6 +171,17 @@ void matrix_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
       printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmul_opt6_transposed_tile_tme", elapsed, checksum);
       break;
     }
+    case 999:
+    {
+      init_data(A, ew, C, DIMENSION);
+      auto start = std::chrono::high_resolution_clock::now();
+      matmult_dtl_transposed(A, er, C, DIMENSION);
+      auto end = std::chrono::high_resolution_clock::now();
+      double elapsed = std::chrono::duration<double>(end - start).count();
+      double checksum = print_checksum(C, DIMENSION);
+      //printf("%.12s  secs: %.6f  chsum: %.6f\n", "matmult_dtl_transposed", elapsed, checksum);
+      break;
+    }
     default:
     {
       printf("matrix_benchmark %d not implemented\n", benchmark);
@@ -225,11 +237,12 @@ void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
 
 #define DEFAULT_ROW_COUNT 43690
 #define DEFAULT_COL_SIZE 4
-void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, DTL::API* api)
+void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, DTL::API* api, bool log)
 {
   std::string dtl_bench_config = "database_row" + std::to_string(row_size) + "_" + std::to_string(col_count) + "col.dtl";
   std::string config_file = "./configs/" + dtl_bench_config;
-  printf("Running Database Benchmark for row_size=%d, col_count=%d\n", row_size, col_count);
+  if (log)
+    printf("Running Database Benchmark for row_size=%d, col_count=%d\n", row_size, col_count);
   uint32_t* db = new uint32_t[(row_size/DEFAULT_COL_SIZE)*DEFAULT_ROW_COUNT];
   
   uint32_t* ew = (uint32_t*)ephemeral->GetHeadlessWriteregion();
@@ -320,7 +333,10 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   }
 
   for (int i = 0; i < col_count; i++)
-    printf("col_offset[%d] %d\n", i, col_offsets[i]);
+  {
+    if (log)
+      printf("col_offset[%d] %d\n", i, col_offsets[i]);
+  }
   uint32_t checksum = 0;
   uint32_t* out_array = new uint32_t[DEFAULT_ROW_COUNT*col_count];
   uint32_t out_write_index = 0;
@@ -338,7 +354,8 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   // get checksum
   for (int x = 0; x < col_count*DEFAULT_ROW_COUNT; x++)
     checksum += out_array[x];
-  printf("%.12s  secs: %.6f, chsum: %lu\n", dtl_bench_config.c_str(), elapsed, checksum);
+  if (log)
+    printf("%.12s  secs: %.6f, chsum: %lu\n", dtl_bench_config.c_str(), elapsed, checksum);
   //delete out_array;
 
   /*
@@ -362,10 +379,87 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   // get checksum
   for (int x = 0; x < col_count*DEFAULT_ROW_COUNT; x++)
     checksum += out_array2[x];
-  printf("dtu_%.12s  secs: %.6f, chsum: %lu\n", dtl_bench_config.c_str(), elapsed, checksum);
+  if (log)
+    printf("dtu_%.12s  secs: %.6f, chsum: %lu\n", dtl_bench_config.c_str(), elapsed, checksum);
   delete col_offsets;
 }
 
+
+
+void set_thread_affinity(int core_id)
+{
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+
+    pthread_t current_thread = pthread_self();
+    int rc = pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
+    if (rc != 0)
+    {
+        std::cerr << "Error calling pthread_setaffinity_np: " << rc << "\n";
+    }
+}
+
+
+void multi_benchmark(int thread_count, DTL::API* api)
+{
+  assert(thread_count <= api->GetHWStat()->nMaxConfigs);
+
+  unsigned int num_cores = std::thread::hardware_concurrency();
+  std::vector<std::thread> threads;
+  threads.reserve(thread_count);
+  std::vector<DTL::EphemeralRegion*> ephemeral_vars;
+  std::vector<float*> Ax;
+  std::vector<float*> Cx;
+
+  for (int i = 0; i < thread_count; i++)
+  {
+    auto ephemeral = api->AllocEphemeralRegion(0x1000000);
+    ephemeral_vars.push_back(ephemeral);
+    float* a = new float[640*640];
+    float* c = new float[640*640];
+    Ax.push_back(a);
+    Cx.push_back(c);
+  }
+    
+
+  if (!api->Compile(FileToString("./configs/transpose_640x640.dtl"))) {
+      printf("Failed to compile dtl program or map onto agu\n");
+      return;
+  }
+  
+
+
+  for (int x = 0; x < thread_count; ++x)
+  {
+      threads.emplace_back([=]() {
+          set_thread_affinity(x % num_cores);
+          // Each thread gets its own ephemeral region
+          auto ephemeral = ephemeral_vars[x];
+          api->ProgramHardware(ephemeral);
+          float* ew = (float*)ephemeral->GetHeadlessWriteregion();
+          float* er = (float*)ephemeral->GetHeadlessReadRegion();
+          auto A = Ax[x];
+          auto C = Cx[x];
+          init_data(A, ew, C, DIMENSION);
+          auto start = std::chrono::high_resolution_clock::now();
+          matmult_dtl_transposed(A, er, C, DIMENSION);
+          auto end = std::chrono::high_resolution_clock::now();
+          double elapsed = std::chrono::duration<double>(end - start).count();
+          double checksum = print_checksum(C, DIMENSION);
+          printf("%d chsum: %.6f\n", x, checksum);
+          if (x == thread_count-1)
+            printf("elapsed %d: %.6f\n", x, elapsed);
+      });
+  }
+
+
+  // Wait for all threads to finish
+  for (auto& t : threads)
+  {
+      t.join();
+  }
+}
 
 
 int main(int argc, char* argv[]) {
@@ -419,10 +513,13 @@ int main(int argc, char* argv[]) {
     assert(argc == 4);
     int row_size = std::stoi(argv[2]);
     int col_count = std::stoi(argv[3]);
-    db_benchmark(row_size, col_count, ephemeral, api);
+    db_benchmark(row_size, col_count, ephemeral, api, true);
   }
   else if (strcmp(argv[1], "--multi") == 0) // multithreaded
   {
+    int threads = std::stoi(argv[2]);
+    multi_benchmark(threads, api);
+
     // want to be able to run different number of threads on different configs or same config
     //auto ephemeral = api->AllocEphemeralRegion(0x1000000ULL);
     //auto ephemeral2 = api->AllocEphemeralRegion(0x1000000ULL);
