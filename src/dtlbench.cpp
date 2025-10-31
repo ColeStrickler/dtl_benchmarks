@@ -227,14 +227,18 @@ void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
 #define DEFAULT_COL_SIZE 4
 void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, DTL::API* api)
 {
-  std::string dtl_bench_config = "database_row" + std::to_string(row_size) + "_" + std::to_string(3) + "col.dtl";
+  std::string dtl_bench_config = "database_row" + std::to_string(row_size) + "_" + std::to_string(col_count) + "col.dtl";
   std::string config_file = "./configs/" + dtl_bench_config;
   printf("Running Database Benchmark for row_size=%d, col_count=%d\n", row_size, col_count);
   uint32_t* db = new uint32_t[(row_size/DEFAULT_COL_SIZE)*DEFAULT_ROW_COUNT];
   
   uint32_t* ew = (uint32_t*)ephemeral->GetHeadlessWriteregion();
   uint32_t* er = (uint32_t*)ephemeral->GetHeadlessReadRegion();
-
+  if (!api->Compile(FileToString(config_file))) {
+      printf("Failed to compile dtl program or map onto agu\n");
+      return;
+  }
+  api->ProgramHardware(ephemeral);
 
   /*
     Initialize data
@@ -242,9 +246,12 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   std::mt19937 rng(292); // fixed seed for reproducibility
   std::uniform_int_distribution<int> dist(-50,50);
   for (int i = 0; i < (row_size/DEFAULT_COL_SIZE)*DEFAULT_ROW_COUNT; i++)
-    db[i] = dist(rng);
-  memcpy(ew, db, (row_size/DEFAULT_COL_SIZE)*DEFAULT_ROW_COUNT*sizeof(uint32_t));
-
+  {
+    auto x = dist(rng);
+    db[i] = x;
+    ew[i] = x;
+  }
+  ephemeral->Sync();
 
   int* col_offsets;
 
@@ -286,14 +293,16 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
           case 3:
           {
             col_offsets = new int[3];
-            int col_offsetsx[] = {508, 1016, 1804};
+            int col_offsetsx[] = {104, 256, 444};
             memcpy(col_offsets, col_offsetsx, sizeof(int)*3);
+            break;
           }
           case 11:
           {
             col_offsets = new int[11];
-            int col_offsetsx[] = {4, 32, 256, 508, 680, 880, 1016, 1400, 1804, 2000, 2024};
+            int col_offsetsx[] = {4, 64, 120, 164, 256, 312, 368, 400, 444, 488, 500};
             memcpy(col_offsets, col_offsetsx, sizeof(int)*11);
+            break;
           }
           default:
           {
@@ -310,8 +319,8 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
       }
   }
 
-
-
+  for (int i = 0; i < col_count; i++)
+    printf("col_offset[%d] %d\n", i, col_offsets[i]);
   uint32_t checksum = 0;
   uint32_t* out_array = new uint32_t[DEFAULT_ROW_COUNT*col_count];
   uint32_t out_write_index = 0;
@@ -319,7 +328,7 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   auto start = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < DEFAULT_ROW_COUNT; i++)
   {
-    for (int j = 0; j < col_count; col_count++)
+    for (int j = 0; j < col_count; j++)
     {
         out_array[out_write_index++] = READ_UINT32(((uint64_t)db) + i*row_size + col_offsets[j]);
     }
@@ -329,8 +338,8 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   // get checksum
   for (int x = 0; x < col_count*DEFAULT_ROW_COUNT; x++)
     checksum += out_array[x];
-  printf("%.12s  secs: %.6f, chsum: %ld\n", dtl_bench_config.c_str(), elapsed, checksum);
-  delete out_array;
+  printf("%.12s  secs: %.6f, chsum: %lu\n", dtl_bench_config.c_str(), elapsed, checksum);
+  //delete out_array;
 
   /*
     Now through DTU
@@ -343,7 +352,7 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   uint32_t row_span_dtu = col_count*DEFAULT_COL_SIZE;
   for (int i = 0; i < DEFAULT_ROW_COUNT; i++)
   {
-    for (int j = 0; j < col_count; col_count++)
+    for (int j = 0; j < col_count; j++)
     {
         out_array2[out_write_index2++] = READ_UINT32(((uint64_t)er) + i*row_span_dtu + j*DEFAULT_COL_SIZE);
     }
@@ -353,7 +362,7 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
   // get checksum
   for (int x = 0; x < col_count*DEFAULT_ROW_COUNT; x++)
     checksum += out_array2[x];
-  printf("dtu_%.12s  secs: %.6f, chsum: %ld\n", dtl_bench_config.c_str(), elapsed, checksum);
+  printf("dtu_%.12s  secs: %.6f, chsum: %lu\n", dtl_bench_config.c_str(), elapsed, checksum);
   delete col_offsets;
 }
 
@@ -362,6 +371,10 @@ void db_benchmark(int row_size, int col_count, DTL::EphemeralRegion* ephemeral, 
 int main(int argc, char* argv[]) {
   auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 5, 6, 4, 3, 1);
   hwStat->nMaxConfigs = 2;
+  
+
+
+
 
 
   auto api = new DTL::API(hwStat);
@@ -370,7 +383,19 @@ int main(int argc, char* argv[]) {
     printf("DTL::API::HASERROR\n");
     return 0;
   }
-  auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
+
+
+    /*
+    Reset all configurations
+  */
+  for (int i = 0; i < hwStat->nMaxConfigs; i++)
+  {
+      api->ResetConfig(i);
+  }
+
+
+
+  //auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
   //auto ephemeral2 = api->AllocEphemeralRegion(0x8000000ULL);
 
 
@@ -390,7 +415,7 @@ int main(int argc, char* argv[]) {
   }
   else if (strcmp(argv[1], "--db") == 0)
   {
-    auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
+    auto ephemeral = api->AllocEphemeralRegion(0x1000000ULL);
     assert(argc == 4);
     int row_size = std::stoi(argv[2]);
     int col_count = std::stoi(argv[3]);

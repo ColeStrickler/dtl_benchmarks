@@ -2,11 +2,15 @@ import numpy as np
 import cv2
 import imageio.v2 as imageio
 
-rows = 512
-cols = 512
+size = 512
+kernel = 4
+
+rows = (size + 2*0 -  kernel) // 1 + 1
+cols = (size + 2*0 -  kernel) // 1 + 1
+print(f"rowz {rows}, col {cols}")
 
 # Load raw float32 bytes
-img = np.fromfile("data/cat_gaussian_notme.raw", dtype=np.float32)
+img = np.fromfile("data/im2col_check_tme.raw", dtype=np.float32)
 img = img.reshape((rows, cols))
 
 # If you normalized before saving, values are in [0, 1]

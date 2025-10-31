@@ -1,5 +1,5 @@
-int col_offsets = {508, 1016, 1804};
-int row_size = 2048;
+int col_offsets = {104, 256, 444};
+int row_size = 512;
 
 
 for (int i = 0; i < 43690; i++)
