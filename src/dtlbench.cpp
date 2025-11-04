@@ -229,6 +229,35 @@ void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
 
       break;
     }
+    case 1:
+    {
+      int insize = 64; // 64x64
+      int C_in = 128; // channels in
+      int ksize = 4;
+      int pad = 0;
+      int stride = 1;
+      int out_height = (insize + 2*pad -  ksize) / stride + 1;
+      int out_width = (insize  + 2*pad - ksize) / stride + 1;
+      int C_out = 256;
+
+      float* chw_img_buf = new float[insize*insize*C_in];
+      float* filter_matrix = new float[C_out*C_in*ksize*ksize];
+      float* im2col_cpu_matrix = new float[insize*insize*ksize*ksize];
+
+      float* outbuf = new float[out_height*out_width*C_out]; // transformed im2col
+      im2col_cpu(chw_img_buf, C_in, insize, insize, ksize, 1, 0, im2col_cpu_matrix);
+
+
+      // run default conv
+
+      // run im2col_cpu
+
+      // run im2col_dtu
+
+
+
+
+    }
     default:
       printf("im2col_benchmark %d not implemented\n", benchmark);
   }
@@ -464,7 +493,7 @@ void multi_benchmark(int thread_count, DTL::API* api)
 
 int main(int argc, char* argv[]) {
   auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 5, 6, 4, 3, 1);
-  hwStat->nMaxConfigs = 2;
+  hwStat->nMaxConfigs = 8;
   
 
 
@@ -485,12 +514,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < hwStat->nMaxConfigs; i++)
   {
       api->ResetConfig(i);
-  }
 
-
-
-  //auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
-  //auto ephemeral2 = api->AllocEphemeralRegion(0x8000000ULL);
 
 
   if (strcmp(argv[1], "--matrix") == 0)
@@ -531,6 +555,15 @@ int main(int argc, char* argv[]) {
     printf("Usage: ./dtlbench --[matrix, im2col, db] <benchmark>\n");
     return 0;
   }
+
+  }
+
+
+
+  //auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
+  //auto ephemeral2 = api->AllocEphemeralRegion(0x8000000ULL);
+
+
 
 
 

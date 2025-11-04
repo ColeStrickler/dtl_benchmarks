@@ -40,6 +40,33 @@ void im2col_cpu(float* data_im,
 }
 
 
+
+void naive_conv(float* data_im, int C_In, int size,
+        float* kernel_im, int kernel_count, int ksize,
+        float* out, int out_height, int out_width)
+{
+    for (int k = 0; k < kernel_count; k++)
+    {
+        for (int c = 0; c < C_In; c++)
+        {
+            for (int h = 0; h < size-ksize+1; h++)
+            {
+                for (int w = 0; w < size-ksize+1; w++)
+                {
+                    for (int i = 0; i < ksize; i++)
+                    {
+                        for (int j = 0; j < ksize; j++)
+                        {
+                            out[k*(out_height*out_width) + w + h*(out_width)] += kernel_im[k*(C_In*ksize*ksize) + c*(ksize*ksize) + i*ksize + j] * data_im[c*(size*size) + (h + i)*size + w + j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 float* GetImageBuf(const std::string& filename)
 {
     int H = 1080, W = 1920, C = 3;
