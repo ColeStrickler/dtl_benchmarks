@@ -74,16 +74,23 @@ void zero_matrix(float* matrix, int dimension)
     }
 }
 
-void zero_matrix_int(int* matrix, int dimension)
+double print_checksum_l(float *C, int length)
 {
-    for(int i = 0; i < dimension; i++) {
-        for(int j = 0; j < dimension; j++) {
-            matrix[dimension*i+j] = 0;
-            //printf("%f %f\n", A[dimension*i+j], B[dimension*i+j]);
-        }
-    }
+  double chsum = 0.0f;
+  for (int i = 0; i < length; i++)
+    chsum += C[i];
+
+  return chsum;
 }
 
+void zero_matrix_int(int *matrix, int dimension) {
+  for (int i = 0; i < dimension; i++) {
+    for (int j = 0; j < dimension; j++) {
+      matrix[dimension * i + j] = 0;
+      // printf("%f %f\n", A[dimension*i+j], B[dimension*i+j]);
+    }
+  }
+}
 
 void copy_matrix(float* src, float* dst, int dimension)
 {
@@ -210,7 +217,35 @@ void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
             }
         }
     }
-}   
+}
+
+/*
+  M = C_out
+  K = C_in*ksize*ksize
+  N = out_height*out_width
+
+
+    // A = M*K
+    // B = K*N
+    // C = M*N
+
+*/
+void matmult_conv_blocked(float* A, float* B, float* C, int M, int K, int N)
+{
+
+
+    int i, j, k, ii, jj, kk;
+    int bs = 64; // you can tune this
+
+    for(i = 0; i < M; i += bs)
+        for(k = 0; k < K; k += bs)
+            for(j = 0; j < N; j += bs)
+                for(ii = i; ii < std::min(i + bs, M); ii++)
+                    for(kk = k; kk < std::min(k + bs, K); kk++)
+                        for(jj = j; jj < std::min(j + bs, N); jj++)
+                            C[ii*N + jj] += A[ii*K + kk] * B[kk*N + jj];
+}
+
 
 /*
     This matches benchmark tile_tme

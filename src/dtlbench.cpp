@@ -6,12 +6,14 @@
 #include <string>
 #include <cstring>
 #include <thread>
+#include <pthread.h>
+#include <sched.h>
 
 // User Headers
 #include "matmul.hpp"
 #include "util.hpp"
 #include "im2col.hpp"
-
+#include "dtl_api.hpp"
 
 
 
@@ -192,6 +194,7 @@ void matrix_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
 
 void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* api)
 {
+  printf("im2col_benchmark %d\n", benchmark);
   float* ew = (float*)ephemeral->GetHeadlessWriteregion();
   float* er = (float*)ephemeral->GetHeadlessReadRegion();
   switch(benchmark)
@@ -240,20 +243,76 @@ void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
       int out_width = (insize  + 2*pad - ksize) / stride + 1;
       int C_out = 256;
 
-      float* chw_img_buf = new float[insize*insize*C_in];
-      float* filter_matrix = new float[C_out*C_in*ksize*ksize];
-      float* im2col_cpu_matrix = new float[insize*insize*ksize*ksize];
+      float* chw_img_buf = new float[insize*insize*C_in]; // C_in insize*insize input filters
+      float* filter_matrix = new float[C_out*C_in*ksize*ksize]; // each C_Out applies a ksize*ksize filter to each C_In
 
-      float* outbuf = new float[out_height*out_width*C_out]; // transformed im2col
-      im2col_cpu(chw_img_buf, C_in, insize, insize, ksize, 1, 0, im2col_cpu_matrix);
+      std::mt19937 rng(1234);  // fixed seed
+      std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+      for (int i = 0; i < C_out*C_in*ksize*ksize; i++)
+        filter_matrix[i] = dist(rng);
 
+      for (int i = 0; i < insize*insize*C_in; i++)
+        chw_img_buf[i] = dist(rng);
+
+
+
+      float* im2col_cpu_matrix = new float[out_height*out_width*C_in*ksize*ksize]; // transformed im2col
+
+
+
+
+
+
+      float* outbuf = new float[out_height*out_width*C_out]; 
+      float* outbuf2 = new float[out_height*out_width*C_out];
+      float* outbuf3 = new float[out_height*out_width*C_out];
+      
+
+      
 
       // run default conv
+      auto start = std::chrono::high_resolution_clock::now();
+      //naive_conv(chw_img_buf, C_in, insize, filter_matrix, C_out, ksize, outbuf, out_height, out_width);
+      auto end = std::chrono::high_resolution_clock::now();
+      double elapsed = std::chrono::duration<double>(end - start).count();
+      printf("naive_conv chsum=%.6f, elapsed=%.6f\n", print_checksum_l(outbuf, out_height*out_width*C_out), elapsed);
+
+
+
+
 
       // run im2col_cpu
-
+      // im2col_cpu_matrix: (C_in * ksize * ksize) × (out_height * out_width)
+      int M = C_out;             // 256
+      int K = C_in * ksize*ksize; // 128*4*4 = 2048
+      int N = out_height * out_width; // 61*61 = 3721
+      start = std::chrono::high_resolution_clock::now();
+      //im2col_cpu(chw_img_buf, C_in, insize, insize, ksize, 1, 0, im2col_cpu_matrix);
+      //matmult_conv_blocked(filter_matrix, im2col_cpu_matrix, outbuf2, M, K, N);
+      end = std::chrono::high_resolution_clock::now();
+      elapsed = std::chrono::duration<double>(end - start).count();
+      printf("im2col chsum=%.6f, elapsed=%.6f\n", print_checksum_l(outbuf2, out_height*out_width*C_out), elapsed);
       // run im2col_dtu
 
+
+      if (!api->Compile(FileToString("./configs/im2col_chw_1.dtl"))) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return;
+      }
+      api->ProgramHardware(ephemeral);
+      printf("Successfully programmed agu\n");
+
+
+      float* Aw = (float*)ephemeral->GetHeadlessWriteregion();
+      float* Ar = (float*)ephemeral->GetHeadlessReadRegion();
+      memcpy(Aw, chw_img_buf, insize*insize*C_in*sizeof(float));
+
+
+      start = std::chrono::high_resolution_clock::now();
+      matmult_conv_blocked(filter_matrix, Ar, outbuf3, M, K, N);
+      end = std::chrono::high_resolution_clock::now();
+      elapsed = std::chrono::duration<double>(end - start).count();
+      printf("im2col_dtu chsum=%.6f, elapsed=%.6f\n", print_checksum_l(outbuf3, out_height*out_width*C_out), elapsed);
 
 
 
@@ -492,8 +551,16 @@ void multi_benchmark(int thread_count, DTL::API* api)
 
 
 int main(int argc, char* argv[]) {
+
+
+
+
+
+
+
+
   auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 5, 6, 4, 3, 1);
-  hwStat->nMaxConfigs = 8;
+  hwStat->nMaxConfigs = 1;
   
 
 
@@ -508,13 +575,6 @@ int main(int argc, char* argv[]) {
   }
 
 
-    /*
-    Reset all configurations
-  */
-  for (int i = 0; i < hwStat->nMaxConfigs; i++)
-  {
-      api->ResetConfig(i);
-
 
 
   if (strcmp(argv[1], "--matrix") == 0)
@@ -526,7 +586,8 @@ int main(int argc, char* argv[]) {
   }
   else if (strcmp(argv[1], "--im2col") == 0)
   {
-    auto ephemeral = api->AllocEphemeralRegion(0x8000000ULL);
+    printf("[benchmark=im2col]\n");
+    auto ephemeral = api->AllocEphemeralRegion(0x4000000ULL);
     assert(argc == 3);
     int benchmark = std::stoi(argv[2]);
     im2col_benchmark(benchmark, ephemeral, api);
@@ -556,7 +617,7 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  }
+  
 
 
 

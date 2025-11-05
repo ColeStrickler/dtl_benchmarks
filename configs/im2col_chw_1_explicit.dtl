@@ -1,0 +1,11 @@
+for (int c_im = 0; c_im < 64; c_im++) {
+    for (int kh = 0; kh < 4; kh++) {
+        for (int kw = 0; kw < 4; kw++) {
+            for (int h = 0; h < 64-3+1; h++) {
+                for (int w = 0; w < 64-3+1; w++) {
+                    out = c_im*(64*64*4) + (h + kh)*(64*4) + 4*(w + kw);
+                }
+            }
+        }
+    }
+}

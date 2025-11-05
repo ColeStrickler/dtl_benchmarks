@@ -2,8 +2,7 @@
 #define MATMUL_HPP
 #include <random>
 #include <chrono>
-#include "dtl_api.hpp"
-
+#include <cstring>
 
 #define TYPE float
 #define NEON_ALIGNMENT 16
@@ -33,6 +32,9 @@ do { \
 } while (0)
 
 
+
+double print_checksum_l(float* C, int length);
+
 void zero_matrix_int(int* matrix, int dimension);
 void copy_matrix_int(int* src, int* dst, int dimension);
 void init_data_int(int *A, int *B, int *C, int dimension);
@@ -41,6 +43,10 @@ void transpose_naive_int(int *src, int *dst, int src_row, int src_col);
 void matmult_opt3_transposed_int(int *A, int *B, int *C, int dimension);
 void matmult_dtl_transposed_int(int *A, int *B, int *C, int dimension);
 void init_bank_aware_transpose_int(uint64_t base, int* write_out, int dimension);
+
+
+void matmult_conv_blocked(float* A, float* B, float* C, int M, int K, int N);
+
 
 void zero_matrix(float* matrix, int dimension);
 

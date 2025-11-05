@@ -10,7 +10,12 @@ float im2col_get_pixel(float *im, int height, int width, int channels,
 
 void im2col_cpu(float* data_im,
      int channels,  int height,  int width,
-     int ksize,  int stride, int pad, float* data_col);                    
+     int ksize,  int stride, int pad, float* data_col);
+
+
+void naive_conv(float* data_im, int C_In, int size,
+        float* kernel_im, int kernel_count, int ksize,
+        float* out, int out_height, int out_width);                    
 
 float* GetImageBuf(const std::string& filename);
 #endif
