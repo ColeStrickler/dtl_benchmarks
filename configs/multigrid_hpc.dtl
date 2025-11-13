@@ -1,0 +1,26 @@
+
+int height_over_2 = 1024;
+int width_over_2 = 1024;
+int width = 2048;
+int height = 2048;
+
+for (int h = 0; h < height_over_2; h++)
+{
+    for (int w = 0; w < width_over_2; w++)
+    {
+        out = (2*h)*width + 2*w;
+        out = (2*h)*width + 2*w+1;
+        out = (2*h+1)*width + 2*w;
+        out = (2*h+1)*width + 2*w+1;
+    }
+}
+
+
+####### Actual Operation ##########
+for (int h = 0; h < H/2; h++)
+  for (int w = 0; w < W/2; w++)
+    coarse[h*(W/2) + w] =
+      (fine[(2*h)*W + 2*w] +
+       fine[(2*h)*W + 2*w+1] +
+       fine[(2*h+1)*W + 2*w] +
+       fine[(2*h+1)*W + 2*w+1]) / 4;

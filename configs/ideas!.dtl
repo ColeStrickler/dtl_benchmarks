@@ -1,0 +1,187 @@
+int width  = 1920;
+int height = 1080;
+int channels = 3;
+int data_size = 4;
+
+
+
+for (int c = 0; c < channels; c++)
+{
+    for (int x = 0; x < height*width; x++)
+    {
+        out = data_size*(c*(height*width) + x*channels);           
+    }
+}
+
+
+
+
+
+
+- f1_read(c,h,w) = (data_size*(c*(height*width) + (h*width + h)*channels))
+- f2_read(c, kh, kw, h, w) = (data_size * (c_im*(height*width) + (h + kh)*(height) + (w + kw)))
+- f2(f1) --> this cannot be done directly. f1 outputs an address. 
+
+- but we know that f1_write(c', h', w') = address that f2 will read from
+
+- so we can formalize that f2_read(c, kw, kw, h, w) = f1_write(c', h', w')
+----> c*(height*width) + (h + kh)*(height) + (w + kw) = f1_write(c', h', w') = i =
+
+
+img[f1_read] --writes--> out[i] --read by--> f2_read --writes--> out2[x]
+
+
+out[i] = (c*(height*width) + (h'*width + w')*channels)
+i = (w' + h'*width + c'*height*width)
+
+
+
+
+
+
+out2[j] = out[(c*(height*width) + (h + kh)*width + (w + kw))] = out[i]
+j = w + width*h + kw*(width*height) + kh*(width*height*kw) + c*(kh*width*height*kw)
+
+
+
+i = c*(height*width) + (h + kh)*(height) + (w + kw)
+
+(w' + h'*width + c'*height*width) = c*(height*width) + (h + kh)*width + (w + kw)
+
+
+Now let:
+c' = c --> channel index in intermediate buffer is the same index that im2col reads from
+h' = h + kh
+w' = w + kw
+
+(w + kw) + (h + kh)*width + c*height*width = c*(height*width) + (h + kh)*width + (w + kw). -- > equal when these are true
+
+
+out2[x] = out[i] = img[addr_img(c, h+kh, w+kw)]   where i = c*H*W + (h + kh)*W + (w + kw)
+
+addr_img(c, h, w) = (c+ (h*width + w)*channels)
+addr_img(c, h+kh, w+kw) = c + ((h+kh)*width + w + kw)*channels
+
+
+
+
+img = new float[height*width*c];
+out = new float[height*width*c];
+out2 = new float[im2col_out_size];
+// hwc -> chw 
+for (int c = 0; c < channels; c++)
+{
+    for (int h = 0; h < height; h++)
+    {
+        for (int w = 0; w < width; w++)
+        {
+            out[i] = img[(c + (h*width + w)*channels)];
+            i++;
+        }
+                
+    }
+}
+
+// chw -> hwc
+for (int h = 0; h < height; h++)
+{
+    for (int w = 0; w < width; w++)
+    {
+        for (int c = 0; c < channels; c++)
+        {
+            out2[x] = out[c*height*width + w + h*width];
+            x++;
+        }
+    }
+}
+
+// chw -> hwc reordered_loop
+for (int c = 0; c < channels; c++)
+  for (int h = 0; h < height; h++)
+    for (int w = 0; w < width; w++)
+    {
+        // CHW read address
+        int read_addr = c * (height * width) + h * width + w;
+
+        out2[x] = out[h * (width * channels) + w * channels + c];
+        x++;  // now safe — x is correct
+    }
+
+
+
+
+
+
+
+// solve hwc -> chw  + chw -> hwc
+i = w + h*width + c*height*width = c*height*width + w + h*width
+They are equal! --> no transform needed
+
+
+// solve hwc -> chw + chw -> wch
+i = w + h*width + c*height*width = c + h*width*channels + w*channels
+
+
+
+
+// hwc -> chw + hwc -> chw
+i = w' + h'*width + c'*width*height = c + h*width*channels + w*channels
+
+Now let:
+c' = c--> channel index in intermediate buffer is the same index we want to read
+
+i = w' + h'*width + c*width*height = c + h*width*channels + w*channels
+
+
+
+out2[x] = out[i] = img[addr_img(h*channels, w*channels, c)] = img[c + ((h*channels)*width + w*channels)*channels]
+
+
+
+
+
+
+for (int c = 0; c < 3; c++) {
+    for (int kh = 0; kh < 3; kh++) {
+        for (int kw = 0; kw < 3; kw++) {
+            for (int h = 0; h < 1078; h++) {
+                for (int w = 0; w < 1918; w++) {
+                    out2[x] = out[(c*(height*width) + (h + kh)*width + (w + kw))];
+                    x++;
+                }
+            }
+        }
+    }
+}
+
+
+// Case Study 2: Stencil with Halo Exchange
+
+// T1: Interior → With Halo (copy border)
+for (int h = 0; h < H; h++)
+  for (int w = 0; w < W; w++)
+    grid_halo[(h+1)*(W+2) + (w+1)] = grid[h*W + w];
+
+// Stencil computation
+
+// T2: Halo → Interior (strip halo)
+for (int h = 0; h < H; h++)
+  for (int w = 0; w < W; w++)
+    grid_new[h*W + w] = grid_halo[(h+1)*(W+2) + (w+1)];
+
+
+
+Case Study 3: Multi-Grid Restrict + Prolong
+
+// T1: Fine → Coarse (average 2x2 → 1)
+for (int h = 0; h < H/2; h++)
+  for (int w = 0; w < W/2; w++)
+    coarse[h*(W/2) + w] = (fine[(2*h)*W + 2*w] + 
+                           fine[(2*h)*W + 2*w+1] + ...)/4;
+
+// Solve on coarse
+
+// T2: Coarse → Fine (bilinear prolong)
+for (int h = 0; h < H; h++)
+  for (int w = 0; w < W; w++)
+    fine_new[h*W + w] = interpolate(coarse, h/2, w/2);

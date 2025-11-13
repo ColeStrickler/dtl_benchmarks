@@ -278,9 +278,6 @@ void im2col_benchmark(int benchmark, DTL::EphemeralRegion* ephemeral, DTL::API* 
       printf("naive_conv chsum=%.6f, elapsed=%.6f\n", print_checksum_l(outbuf, out_height*out_width*C_out), elapsed);
 
 
-
-
-
       // run im2col_cpu
       // im2col_cpu_matrix: (C_in * ksize * ksize) × (out_height * out_width)
       int M = C_out;             // 256

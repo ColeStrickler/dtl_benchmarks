@@ -39,3 +39,9 @@
 
 # debug information files
 *.dwo
+utility/data/*
+
+# images
+*.jpg
+*.jpeg
+*.png
