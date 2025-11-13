@@ -24,3 +24,8 @@ for (int h = 0; h < H/2; h++)
        fine[(2*h)*W + 2*w+1] +
        fine[(2*h+1)*W + 2*w] +
        fine[(2*h+1)*W + 2*w+1]) / 4;
+
+// interpolation
+for (int h = 0; h < H; h++)
+  for (int w = 0; w < W; w++)
+    fine_new[h*W + w] = interpolate(coarse, h/2, w/2);

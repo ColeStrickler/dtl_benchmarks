@@ -547,6 +547,18 @@ void multi_benchmark(int thread_count, DTL::API* api)
 }
 
 
+
+
+void hpc_multigrid_benchmark()
+{
+  
+}
+
+
+
+
+
+
 int main(int argc, char* argv[]) {
 
 

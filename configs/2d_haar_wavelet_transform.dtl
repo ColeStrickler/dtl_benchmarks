@@ -1,0 +1,62 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+// Assume H and W are even
+void haar2d(float* input, float* approx, float* horiz, float* vert, float* diag, int H, int W) {
+    int hh = H / 2;
+    int ww = W / 2;
+
+    for (int h = 0; h < hh; h++) {
+        for (int w = 0; w < ww; w++) {
+            // 2x2 block in input
+            float a = input[(2*h)*W + 2*w];
+            float b = input[(2*h)*W + 2*w + 1];
+            float c = input[(2*h + 1)*W + 2*w];
+            float d = input[(2*h + 1)*W + 2*w + 1];
+
+            // Haar transform: averages and differences
+            approx[h*ww + w] = (a + b + c + d) / 4.0f;         // low frequency
+            horiz[h*ww + w]  = (a + b - c - d) / 4.0f;         // horizontal detail
+            vert[h*ww + w]   = (a - b + c - d) / 4.0f;         // vertical detail
+            diag[h*ww + w]   = (a - b - c + d) / 4.0f;         // diagonal detail
+        }
+    }
+}
+
+// Optional: inverse transform (reconstructs input from approx+details)
+void inverse_haar2d(float* approx, float* horiz, float* vert, float* diag, float* output, int H, int W) {
+    int hh = H / 2;
+    int ww = W / 2;
+
+    for (int h = 0; h < hh; h++) {
+        for (int w = 0; w < ww; w++) {
+            float a = approx[h*ww + w] + horiz[h*ww + w] + vert[h*ww + w] + diag[h*ww + w];
+            float b = approx[h*ww + w] + horiz[h*ww + w] - vert[h*ww + w] - diag[h*ww + w];
+            float c = approx[h*ww + w] - horiz[h*ww + w] + vert[h*ww + w] - diag[h*ww + w];
+            float d = approx[h*ww + w] - horiz[h*ww + w] - vert[h*ww + w] + diag[h*ww + w];
+
+            output[(2*h)*W + 2*w]     = a;
+            output[(2*h)*W + 2*w + 1] = b;
+            output[(2*h + 1)*W + 2*w] = c;
+            output[(2*h + 1)*W + 2*w + 1] = d;
+        }
+    }
+}
+
+int main() {
+    int H = 4, W = 4;
+    float input[16] = { 1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16 };
+    float approx[4], horiz[4], vert[4], diag[4];
+    float output[16];
+
+    haar2d(input, approx, horiz, vert, diag, H, W);
+    inverse_haar2d(approx, horiz, vert, diag, output, H, W);
+
+    printf("Reconstructed:\n");
+    for (int i=0; i<H; i++) {
+        for (int j=0; j<W; j++)
+            printf("%f ", output[i*W + j]);
+        printf("\n");
+    }
+    return 0;
+}
