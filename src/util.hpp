@@ -25,6 +25,9 @@
 #define RME_RESET(base)             ((uint64_t)base + 16 * 0x10 + 0x48)
 #define RELCACHE_ADDR  0x110000000UL
 #define RELCACHE_SIZE  0x00fffffffUL
+
+#ifndef ACCESS_HELPERS
+#define ACCESS_HELPERS
 #define WRITE_BOOL(addr, value)(*(bool*)(addr) = value)
 #define WRITE_UINT8(addr, value)(*(uint8_t*)(addr) = value)
 #define WRITE_UINT16(addr, value)(*(uint16_t*)(addr) = value)
@@ -36,6 +39,7 @@
 #define READ_UINT16(addr)(*(uint16_t*)(addr))
 #define READ_UINT32(addr)(*(uint32_t*)(addr))
 #define READ_UINT64(addr)(*(uint64_t*)(addr))
+#endif
 
 
 int open_fd();
