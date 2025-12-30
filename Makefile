@@ -10,6 +10,8 @@ CXX_X86 = g++
 INCLUDE_DIR = ./src
 SRC_DIR = ./src
 DTL_DIR     = ./src/dtl/src
+CUSTOM_BOOM_COUNTERS = -DBOOM_PERF_EXTRA
+
 
 # Compilation flags
 CXXFLAGS = -I$(INCLUDE_DIR) -I$(DTL_DIR) -O3 -g -D __aarch64__ -std=c++17 -pthread

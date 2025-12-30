@@ -10,6 +10,7 @@ H, W, C = image.shape
 print("Shape:", image.shape)  # (H, W, C)
 
 
+
 # --- Dump HWC raw bytes ---
 hwc_bytes = image.astype(np.float32).tobytes()
 with open("data/image_hwc_512x512.raw", "wb") as f:

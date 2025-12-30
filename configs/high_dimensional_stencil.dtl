@@ -1,0 +1,7 @@
+center = A[i][j][k];
+north  = A[i][j+1][k];   // large stride (one whole X-plane)
+south  = A[i][j-1][k];
+east   = A[i][j][k+1];   // stride-1 (good)
+west   = A[i][j][k-1];
+up     = A[i+1][j][k];   // HUGE stride (one entire YZ-slab)
+down   = A[i-1][j][k];

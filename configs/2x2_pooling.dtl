@@ -1,0 +1,15 @@
+void avg_pool2x2(float* input, float* output, int H, int W) {
+    int H2 = H/2;
+    int W2 = W/2;
+
+    for (int h = 0; h < H2; h++) {
+        for (int w = 0; w < W2; w++) {
+            float sum = 0.0f;
+            sum += input[(2*h)*W + 2*w];
+            sum += input[(2*h)*W + 2*w + 1];
+            sum += input[(2*h+1)*W + 2*w];
+            sum += input[(2*h+1)*W + 2*w + 1];
+            output[h*W2 + w] = sum / 4.0f;  // average
+        }
+    }
+}

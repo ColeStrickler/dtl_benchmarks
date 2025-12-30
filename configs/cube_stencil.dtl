@@ -1,0 +1,2 @@
+offsets = [-width*height - width - 1, ..., +1, ..., +width*height + width + 1]
+can stencil a whole cube!

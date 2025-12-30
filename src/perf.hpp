@@ -26,15 +26,17 @@
     Custom intra-core counters for the boom core
 */
 #ifdef INCLUDE_BOOM_PERF_EXTRA
-#define CSR_ROB_FULL 0x520
-#define CSR_ROB_EMPTY 0x521
-#define CSR_BR_MISPREDICT 0x522
-#define CSR_L1I_MISS 0x523
-#define CSR_L1D_MISS 0x524
-#define CSR_L1D_RELEASE 0x525
-#define CSR_ITLB_MISS 0x526
-#define CSR_DTLB_MISS 0x527
-#define CSR_L2TLB_MISS 0x528
+#define CSR_ROB_FULL        0x020
+#define CSR_ROB_EMPTY       0x021
+#define CSR_BR_MISPREDICT   0x022
+#define CSR_L1I_MISS        0x023
+#define CSR_L1D_MISS        0x024
+#define CSR_L1D_RELEASE     0x025
+#define CSR_ITLB_MISS       0x026
+#define CSR_DTLB_MISS       0x027
+#define CSR_L2TLB_MISS      0x028
+#define CSR_FPISSUE_STALL   0x029
+#define CSR_INTISSUE_STALL  0x02a
 #endif
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS

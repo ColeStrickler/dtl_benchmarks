@@ -1,0 +1,21 @@
+int batch_size = 8;
+int height = 64;
+int width = 64;
+int channels = 3;
+
+
+// need data_size
+// assume chw format
+for (int c = 0; c < channels; c++)
+{
+    for (int h = 0; h < height; h++)
+    {
+        for (int n = 0; n < batch_size; n++)
+        {
+            for (int w = 0; w < width; w++)
+            {
+                out = w + n*(height*width*channels*4) + h*(width*4) + c*(4*height*width); 
+            }
+        }
+    }
+}
