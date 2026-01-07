@@ -31,17 +31,23 @@ int dump_buffer_to_disk(const std::string& outfile, unsigned char* outbuf, unsig
     return 0;
 }
 
+void randomize_region_deterministic(uint8_t *data, size_t size){
+    if (!data || size == 0) return;
 
+    static std::mt19937 gen(12345); // fixed seed
+    static std::uniform_int_distribution<uint8_t> dist(0, 255);
 
-int open_fd() {
-    int fd = open("/dev/mem", O_RDWR | O_SYNC);
-    if (fd == -1) {
-        printf("Can't open /dev/mem.\n");
-        exit(0);
-    }
-    return fd;
+    std::generate(data, data + size, [&]() { return dist(gen); });
 }
 
+int open_fd() {
+  int fd = open("/dev/mem", O_RDWR | O_SYNC);
+  if (fd == -1) {
+    printf("Can't open /dev/mem.\n");
+    exit(0);
+  }
+  return fd;
+}
 
 volatile void flush_cache() {
     char *array = (char*)malloc(32*SIZE);
@@ -146,16 +152,4 @@ volatile void FlushAndDisable(int fd)
 }
 
 
-
-uint64_t read_cycle() {
-    uint64_t cycle_count;
-    asm volatile ("csrr %0, cycle" : "=r"(cycle_count));
-    return cycle_count;
-}
-
-uint64_t read_instret() {
-    uint64_t instret;
-    asm volatile ("csrr %0, instret" : "=r"(instret));
-    return instret;
-}
 

@@ -1,6 +1,7 @@
 #ifndef DTL_PERF_H
 #define DTL_PERF_H
 #include <stdint.h>
+#include <string>
 
 #ifndef ACCESS_HELPERS
 #define ACCESS_HELPERS
@@ -20,7 +21,7 @@
 
 
 
-#define INCLUDE_INCLUSIVE_LLC_COUNTERS
+//#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 #define INCLUDE_BOOM_PERF_EXTRA
 /*
     Custom intra-core counters for the boom core
@@ -47,6 +48,10 @@
 
 struct RocketChipCounters
 {
+
+    uint64_t m_Cycle;
+    uint64_t m_InstRet;
+
 #ifdef  INCLUDE_BOOM_PERF_EXTRA
     uint64_t m_RobFull;
     uint64_t m_RobEmpty;
@@ -57,6 +62,8 @@ struct RocketChipCounters
     uint64_t m_iTLBMiss;
     uint64_t m_dTLBMiss;
     uint64_t m_L2TLBMiss;
+    uint64_t m_FPIssueStall;
+    uint64_t m_IntIssueStall;
 #endif
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
@@ -64,8 +71,10 @@ struct RocketChipCounters
     uint64_t m_LLCMissCounter;
 #endif
 
-    uint64_t m_Cycle;
-    uint64_t m_InstRet;
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+
+
+#endif
 };
 
 
@@ -78,13 +87,13 @@ static inline uint64_t read_csr(uint32_t csr)
     return value;
 }
 
-uint64_t read_instret() {
+inline uint64_t read_instret() {
     uint64_t instret;
     asm volatile ("csrr %0, instret" : "=r"(instret));
     return instret;
 }
 
-uint64_t read_cycle() {
+inline uint64_t read_cycle() {
     uint64_t cycle_count;
     asm volatile ("csrr %0, cycle" : "=r"(cycle_count));
     return cycle_count;
@@ -98,6 +107,9 @@ public:
     PerfManager();
     ~PerfManager();
 
+    void ClearCounters();
+    static std::string PrintCountersLabel();
+    std::string PrintCounters();
     void CollectCounters();
     void CollectDelta();
     RocketChipCounters GetCounters();
@@ -117,9 +129,6 @@ public:
 
 private:
     RocketChipCounters m_Counters;
-
-
-
 };
 
 #endif

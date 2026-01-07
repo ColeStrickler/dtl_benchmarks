@@ -7,14 +7,14 @@ CXX = riscv64-unknown-linux-gnu-g++
 # Native Compiler
 CXX_X86 = g++
 # Directories
-INCLUDE_DIR = ./src
+INCLUDE_DIR = -I./src -I./src/benchmarks
 SRC_DIR = ./src
 DTL_DIR     = ./src/dtl/src
 CUSTOM_BOOM_COUNTERS = -DBOOM_PERF_EXTRA
 
 
 # Compilation flags
-CXXFLAGS = -I$(INCLUDE_DIR) -I$(DTL_DIR) -O3 -g -D __aarch64__ -std=c++17 -pthread
+CXXFLAGS = $(INCLUDE_DIR) -I$(DTL_DIR) -O3 -g -D __aarch64__ -std=c++17 -pthread
 
 # C++ source files
 CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp) 

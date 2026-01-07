@@ -15,6 +15,11 @@
 #include <iostream>
 #include <sstream>
 #include <unistd.h>
+#include <random>
+#include <algorithm>    // for std::generate
+
+
+
 #define RME_CONFIG                  0x3000000
 #define RME_CONFIG_SIZE             0xfff
 #define RME_EN(base)				((uint64_t)base)
@@ -42,9 +47,10 @@
 #endif
 
 
+void randomize_region_deterministic(uint8_t* data, size_t size);
+
+
 int open_fd();
-uint64_t read_cycle();
-uint64_t read_instret();
 volatile void FlushAndDisable(int fd);
 int EnableRelCache(int fd);
 int reset_relcache(unsigned int frame_offset);
@@ -53,6 +59,7 @@ std::string FileToString(const std::string &file_);
 int dump_buffer_to_disk(const std::string& outfile, unsigned char* outbuf, unsigned int buf_size);
 int configure_relcache();
 volatile void flush_cache();
+
 
 #endif
 

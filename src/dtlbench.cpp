@@ -10,6 +10,9 @@
 #include <sched.h>
 
 // User Headers
+
+#include "benchmarks.hpp"
+
 #include "matmul.hpp"
 #include "util.hpp"
 #include "im2col.hpp"
@@ -557,8 +560,6 @@ void hpc_multigrid_benchmark()
 
 
 
-
-
 int main(int argc, char* argv[]) {
 
 
@@ -583,6 +584,14 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
+  for (auto& bench : benchmark::BenchmarkDispatchData)
+  {
+    printf("calling bench\n");
+    std::cout << bench.benchmark(bench, api);
+  }
+
+
+  return 0;
 
 
 

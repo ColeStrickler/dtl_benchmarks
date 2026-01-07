@@ -8,7 +8,7 @@ for (int c_im = 0; c_im < 3; c_im++) {
         for (int kw = 0; kw < 3; kw++) {
             for (int h = 0; h < 1078; h++) {
                 for (int w = 0; w < 1918; w++) {
-                    out = data_size*(c_im*(height*width) + (h + kh)*width + (w + kw));
+                    out = c_im*(data_size*height*width) + (h + kh)*data_size*width + data_size*(w + kw);
                 }
             }
         }
