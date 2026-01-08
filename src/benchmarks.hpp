@@ -16,6 +16,8 @@
 #include "im2col.hpp"
 #include "dtl_api.hpp"
 #include "matmul.hpp"
+#include "tensor_permutation.hpp"
+#include "batch2space.hpp"
 
 
 namespace benchmark
@@ -64,6 +66,9 @@ std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 
 
 
+/*
+    Maybe later we can set up a data element size. for now it is always assumed element_size=4bytes
+*/
 
 static std::vector<BenchmarkData> BenchmarkDispatchData = {
     {
@@ -88,11 +93,268 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
         ""                              // artifact out
     },
 
+    {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {64}},         
+            {"col_offsets", {4, 8, 16, 24, 28, 32, 40, 48, 52, 56, 60}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 43690},            
+            {"COLUMNS", 11},
+        },
+        {                               // OTHER
+  
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {64}},         
+            {"col_offsets", {4, 32, 48}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 43690},            
+            {"COLUMNS", 3},
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {512}},         
+            {"col_offsets", {104, 256, 444}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 43690},            
+            {"COLUMNS", 3},
+        },
+        {                               // OTHER
+  
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {512}},         
+            {"col_offsets", {4, 64, 120, 164, 256, 312, 368, 400, 444, 488, 500}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 43690},            
+            {"COLUMNS", 11},
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "matmul_transpose",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {2560}},         
+            {"col_size", {4}},
+        },
+        {                               // LOOP PARAMETERS
+            {"NROWS", 640},
+            {"NCOLS", 640}                 
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_matmul_transpose, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "nhwc_permutation",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {128}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 16},
+            {"CHANNELS", 3},
+            {"SIZE_SQUARED", 128*128}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_nhwc_permutation, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "nhwc_permutation",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {64}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 16},
+            {"CHANNELS", 3},
+            {"SIZE_SQUARED", 64*64}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_nhwc_permutation, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "nhwc_permutation",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {256}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 16},
+            {"CHANNELS", 3},
+            {"SIZE_SQUARED", 256*256}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_nhwc_permutation, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "nhwc_permutation",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {256}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 8},
+            {"CHANNELS", 3},
+            {"SIZE_SQUARED", 256*256}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_nhwc_permutation, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "batch2space",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {512}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 8},
+            {"CHANNELS", 3},
+            {"HEIGHT", 512},
+            {"WIDTH", 512}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_batch2space, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "batch2space",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {64}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 16},
+            {"CHANNELS", 3},
+            {"HEIGHT", 64},
+            {"WIDTH", 64}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_batch2space, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+        {
+        "batch2space",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {64}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 128},
+            {"CHANNELS", 3},
+            {"HEIGHT", 64},
+            {"WIDTH", 64}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_batch2space, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
 };
 
 
 
 
+
+
+
+
+static std::vector<BenchmarkData> BenchmarkDispatchDataLong = {
+    {
+        "matmul_transpose",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {8192}},         
+            {"col_size", {4}},
+        },
+        {                               // LOOP PARAMETERS
+            {"NROWS", 2048},
+            {"NCOLS", 2048}            
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_matmul_transpose, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
 };
 
 
@@ -103,7 +365,7 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
 
 
 
-
+};
 
 
 

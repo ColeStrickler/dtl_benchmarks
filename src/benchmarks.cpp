@@ -120,7 +120,7 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data, DTL
     // CPU benchmark
 
     perf.ClearCounters();
-    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(in_data_size);
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(im2col_matsize*sizeof(float));
 
     if (!api->Compile(conf)) {
         printf("Failed to compile dtl program or map onto agu\n");
@@ -151,6 +151,360 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data, DTL
     delete[] outbuf2;
     delete[] im2col_cpu_matrix;
     delete[] filter_matrix;
+    api->FreeEphemeralRegion(ephemeral);
+
+    return results;
+}
+
+std::string benchmark::bench_wrapper_db_colproject(const BenchmarkData &bench_data, DTL::API *api) 
+{
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+
+    assert(bench_data.params.find("ROWS") != bench_data.params.end());
+    //assert(bench_data.other.find("CHANNELS_OUT") != bench_data.other.end());
+    assert(bench_data.params.find("COLUMNS") != bench_data.params.end());
+    assert(bench_data.constants.find("row_size") != bench_data.constants.end());
+    assert(bench_data.constants.find("col_offsets") != bench_data.constants.end());
+
+
+
+    int row_count = bench_data.params.at("ROWS");
+    int col_count = bench_data.params.at("COLUMNS");
+    int row_size = bench_data.constants.at("row_size")[0]; // row size in bytes
+    std::vector<uint32_t> col_offsets = bench_data.constants.at("col_offsets");
+    std::string db_info = std::to_string(row_count) + "_" + std::to_string(col_count) + "_" + std::to_string(row_size);
+
+
+    uint32_t db_size = row_size*row_count; // db size in bytes
+    auto db_cpu_raw = new uint8_t[db_size];
+    uint32_t* db_cpu = reinterpret_cast<uint32_t*>(db_cpu_raw);
+    uint32_t* write_out1 = new uint32_t[col_count*row_count];
+    uint32_t* write_out2 = new uint32_t[col_count*row_count];
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(db_cpu), db_size); // write dummy data to database
+    
+    perf.CollectCounters();
+    int out_write_index1 = 0;
+    for (int i = 0; i < row_count; i++)
+    {
+        for (int j = 0; j < col_count; j++)
+        {
+            write_out1[out_write_index1++] = READ_UINT32(((uint64_t)db_cpu) + i*row_size + col_offsets[j]);
+        }
+    }
+    perf.CollectDelta();
+    results += "dbcolproj_cpu_" + db_info + "," + perf.PrintCounters() + "\n";
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(db_size);
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    uint32_t* Aw = (uint32_t*)ephemeral->GetHeadlessWriteregion();
+    uint32_t* Ar = (uint32_t*)ephemeral->GetHeadlessReadRegion();
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), db_size);
+
+    int sum_col_size = col_count*sizeof(uint32_t);
+    perf.CollectCounters();
+    int out_write_index2 = 0;
+    for (int i = 0; i < row_count; i++)
+    {
+        for (int j = 0; j < col_count; j++)
+        {
+            write_out2[out_write_index2++] = READ_UINT32(((uint64_t)Ar) + i*sum_col_size + j*sizeof(uint32_t));
+        }
+    }
+    perf.CollectDelta();
+    std::string counters = perf.PrintCounters();
+    results += "dbcolproj_dtu_" + db_info + "," + counters + "\n";
+
+
+
+    delete[] db_cpu_raw;
+    delete[] write_out1;
+    delete[] write_out2;
+    api->FreeEphemeralRegion(ephemeral);
+
+    return results;
+}
+
+std::string benchmark::bench_wrapper_matmul_transpose(const BenchmarkData &bench_data, DTL::API *api) 
+{
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+
+
+
+    assert(bench_data.params.find("NROWS") != bench_data.params.end());
+    //assert(bench_data.other.find("CHANNELS_OUT") != bench_data.other.end());
+    assert(bench_data.params.find("NCOLS") != bench_data.params.end());
+    assert(bench_data.constants.find("row_size") != bench_data.constants.end());
+    assert(bench_data.constants.find("col_size") != bench_data.constants.end());
+    
+    int nrows = bench_data.params.at("NROWS");
+    int ncols = bench_data.params.at("NCOLS");
+    assert(nrows == ncols); // assume square matrices
+    std::string mat_info = std::to_string(nrows) + "_" + std::to_string(ncols);
+
+    int* A =  new int[nrows*ncols];
+    int* B =  new int[nrows*ncols];
+    int* Bt = new int[nrows*ncols];
+    int* C1 = new int[nrows*ncols];
+    int* C2 = new int[nrows*ncols];
+    init_data_int(A, B, C1, nrows);
+
+    perf.CollectCounters();
+    transpose_naive_int(B, Bt, nrows, ncols);
+    matmult_opt3_pretransposed_int(A, Bt, C1, nrows);
+    perf.CollectDelta();
+    results += "matmul_transpose_cpu_" + mat_info + "," + perf.PrintCounters() + "\n";
+
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(nrows*ncols*sizeof(int));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    int* Aw = (int*)ephemeral->GetHeadlessWriteregion();
+    int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
+
+    init_data_int(A, Aw, C2, nrows);
+
+    perf.CollectCounters();
+    matmult_opt3_pretransposed_int(A, Ar, C2, nrows);
+    perf.CollectDelta();
+    results += "matmul_transpose_dtu_" + mat_info + "," + perf.PrintCounters() + "\n";
+
+
+
+
+    delete A;
+    delete B;
+    delete Bt;
+    delete C1;
+    delete C2;
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+}
+
+std::string benchmark::bench_wrapper_nhwc_permutation(const BenchmarkData &bench_data, DTL::API *api) 
+{
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+
+    assert(bench_data.params.find("BATCH_SIZE") != bench_data.params.end());
+    assert(bench_data.params.find("CHANNELS") != bench_data.params.end());
+    assert(bench_data.params.find("SIZE_SQUARED") != bench_data.params.end());
+    assert(bench_data.constants.find("size") != bench_data.constants.end());
+    assert(bench_data.constants.find("channels") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+    assert(bench_data.other.find("use_real_image") != bench_data.other.end());
+    assert(bench_data.other.find("ksize") != bench_data.other.end());
+
+
+    int batch_size = bench_data.params.at("BATCH_SIZE");
+    int channels = bench_data.constants.at("channels")[0];
+    int img_size = bench_data.constants.at("size")[0]; // square this
+    int data_size = bench_data.constants.at("data_size")[0];
+    int pad = 0;
+    bool use_real_image = bench_data.other.at("use_real_image") == 1;
+    int ksize = bench_data.other.at("ksize");
+    int out_height =    (img_size + 2*pad -  ksize) / 1 + 1;
+    int out_width =     (img_size  + 2*pad - ksize) / 1 + 1;
+
+    std::string img_info = std::to_string(img_size) + "x" + std::to_string(img_size)\
+         + "_k" + std::to_string(ksize) + "x" + std::to_string(ksize) + "_" + std::to_string(batch_size);
+
+    float* base_img; // nhwc
+    float* img_nchw = new float[batch_size*img_size*img_size*channels]; // after permutation
+    float* img_out = new float[batch_size*img_size*img_size*channels]; // after convolution
+    float* img_out2 = new float[batch_size*img_size*img_size*channels]; // after convolution using dtu
+    float* filter = new float[ksize*ksize];
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(filter), ksize*ksize*sizeof(float));
+
+    if (use_real_image)
+        assert(false); // can implement this later. will copy single image batch_size times to make batch
+    else
+    {
+        base_img = new float[batch_size*img_size*img_size*channels];
+        randomize_region_deterministic(reinterpret_cast<uint8_t*>(base_img), batch_size*img_size*img_size*channels*sizeof(float));
+    }
+        
+
+    perf.CollectCounters();
+    nhwc_to_nchw_cpu(base_img, batch_size, channels, img_size, img_size, img_nchw);
+    for (int n = 0; n < batch_size; n++)
+    {
+        for (int c = 0; c < channels; c++)
+        {
+            apply_filter_single_channel_nchw(filter, &img_nchw[n*channels*img_size*img_size + c*img_size*img_size],\
+                 &img_out[n*channels*out_height*out_width + c*out_height*out_width], img_size, ksize);
+        }
+    }  
+    perf.CollectDelta();
+    results += "nhwc_permutation_cpu_" + img_info + "," + perf.PrintCounters() + "\n";
+
+
+    
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(batch_size*img_size*img_size*channels*sizeof(float));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    float* Aw = (float*)ephemeral->GetHeadlessWriteregion();
+    float* Ar = (float*)ephemeral->GetHeadlessReadRegion();
+
+
+    if (use_real_image)
+        assert(false); // can implement this later. will copy single image batch_size times to make batch
+    else
+    {
+        randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), batch_size*img_size*img_size*channels*sizeof(float));
+    }
+
+    perf.CollectCounters();
+    for (int n = 0; n < batch_size; n++)
+    {
+        for (int c = 0; c < channels; c++)
+        {
+            apply_filter_single_channel_nchw(filter, &Ar[n*channels*img_size*img_size + c*img_size*img_size],\
+                 &img_out2[n*channels*out_height*out_width + c*out_height*out_width], img_size, ksize);
+        }
+    }  
+    perf.CollectDelta();
+    results += "nhwc_permutation_dtu_" + img_info + "," + perf.PrintCounters() + "\n";
+
+
+
+    delete[] base_img;
+    delete[] img_out;
+    delete[] img_out2;
+    delete[] img_nchw;
+    delete[] filter;
+    api->FreeEphemeralRegion(ephemeral);
+
+    return results;
+}
+
+std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data, DTL::API *api) 
+{
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+
+    assert(bench_data.params.find("BATCH_SIZE") != bench_data.params.end());
+    assert(bench_data.params.find("CHANNELS") != bench_data.params.end());
+    assert(bench_data.params.find("HEIGHT") != bench_data.params.end());
+    assert(bench_data.params.find("WIDTH") != bench_data.params.end());
+    assert(bench_data.constants.find("size") != bench_data.constants.end());
+    assert(bench_data.constants.find("channels") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+    assert(bench_data.other.find("use_real_image") != bench_data.other.end());
+    assert(bench_data.other.find("ksize") != bench_data.other.end());
+
+
+    int batch_size = bench_data.params.at("BATCH_SIZE");
+    int channels = bench_data.constants.at("channels")[0];
+    int img_size = bench_data.constants.at("size")[0]; // square this
+    int data_size = bench_data.constants.at("data_size")[0];
+    int pad = 0;
+    bool use_real_image = bench_data.other.at("use_real_image") == 1;
+    int ksize = bench_data.other.at("ksize");
+    int out_height =    (img_size + 2*pad -  ksize) / 1 + 1;
+    int out_width =     (img_size  + 2*pad - ksize) / 1 + 1;
+
+    std::string img_info = std::to_string(img_size) + "x" + std::to_string(img_size)\
+         + "_k" + std::to_string(ksize) + "x" + std::to_string(ksize) + "_" + std::to_string(batch_size);
+
+    float* base_img; // nhwc
+    float* img_batch = new float[batch_size*img_size*img_size*channels]; // after permutation
+    float* img_batch_transform = new float[batch_size*img_size*img_size*channels]; // after convolution
+    float* img_batch_out = new float[batch_size*img_size*img_size*channels]; // after convolution
+    float* img_batch_out2 = new float[batch_size*img_size*img_size*channels]; // after convolution using dtu
+    float* filter = new float[ksize*ksize];
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(filter), ksize*ksize*sizeof(float));
+
+    if (use_real_image)
+        assert(false); // can implement this later. will copy single image batch_size times to make batch
+    else
+    {
+        base_img = new float[batch_size*img_size*img_size*channels];
+        randomize_region_deterministic(reinterpret_cast<uint8_t*>(base_img), batch_size*img_size*img_size*channels*sizeof(float));
+    }
+        
+
+    perf.CollectCounters();
+    //nhwc_to_nchw_cpu(base_img, batch_size, channels, img_size, img_size, img_nchw);
+    batch_to_space(base_img, batch_size, channels, img_size, img_size, img_batch_transform);
+    for (int n = 0; n < batch_size; n++)
+    {
+        for (int c = 0; c < channels; c++)
+        {
+            apply_filter_single_channel_nchw(filter, &img_batch_transform[n*channels*img_size*img_size + c*img_size*img_size],\
+                 &img_batch_out[n*channels*out_height*out_width + c*out_height*out_width], img_size, ksize);
+        }
+    }  
+    perf.CollectDelta();
+    results += "batch2space_cpu_" + img_info + "," + perf.PrintCounters() + "\n";
+
+
+    
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(batch_size*img_size*img_size*channels*sizeof(float));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    float* Aw = (float*)ephemeral->GetHeadlessWriteregion();
+    float* Ar = (float*)ephemeral->GetHeadlessReadRegion();
+
+
+    if (use_real_image)
+        assert(false); // can implement this later. will copy single image batch_size times to make batch
+    else
+    {
+        randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), batch_size*img_size*img_size*channels*sizeof(float));
+    }
+
+    perf.CollectCounters();
+    for (int n = 0; n < batch_size; n++)
+    {
+        for (int c = 0; c < channels; c++)
+        {
+            apply_filter_single_channel_nchw(filter, &Ar[n*channels*img_size*img_size + c*img_size*img_size],\
+                 &img_batch_out2[n*channels*out_height*out_width + c*out_height*out_width], img_size, ksize);
+        }
+    }  
+    perf.CollectDelta();
+    results += "batch2space_dtu_" + img_info + "," + perf.PrintCounters() + "\n";
+
+
+
+    delete[] base_img;
+    delete[] img_batch;
+    delete[] img_batch_out;
+    delete[] img_batch_out2;
+    delete[] img_batch_transform;
+    delete[] filter;
+    api->FreeEphemeralRegion(ephemeral);
 
     return results;
 }

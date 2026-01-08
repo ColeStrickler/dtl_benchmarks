@@ -150,6 +150,7 @@ void init_data_int(int *A, int *B, int *C, int dimension)
 
 
 
+
 double print_checksum(float *C, int dimention)
 {
     double sum = 0.0;
@@ -340,7 +341,20 @@ void matmult_opt3_transposed_int(int *A, int *B, int *C, int dimension)
     //free(Bt);
 }
 
+// matrix multiplicaiton after transposed
+void matmult_opt3_pretransposed_int(int *A, int* bt, int *C, int dimension)
+{
+    int i,j,k;
 
+    for(i = 0; i < dimension; i++) {
+        for(j = 0; j < dimension; j++) {
+            for(k = 0; k < dimension; k++) {                            
+                C[dimension*i+j] += (A[dimension*i+k] * bt[dimension*j+k]);
+            }
+        }
+    }
+    //free(Bt);
+}
 
 // matrix multiplicaiton after transposed
 void matmult_opt3_pretransposed(float *A, float* bt, float *C, int dimension)

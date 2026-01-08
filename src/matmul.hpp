@@ -69,6 +69,7 @@ void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension);
 void transpose_naive(float *src, float *dst, int src_row, int src_col);
 
 void matmult_opt3_transposed(float *A, float *B, float *C, float** Bt, int dimension);
+void matmult_opt3_pretransposed_int(int *A, int* bt, int *C, int dimension);
 
 void matmult_dtl_transposed(float *A, float *B, float *C, int dimension);
 
