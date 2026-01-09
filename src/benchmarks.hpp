@@ -72,6 +72,53 @@ std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 */
 
 static std::vector<BenchmarkData> BenchmarkDispatchData = {
+        {
+        "tensor_unfold",                //  Benchmark
+        {                               // CONSTANTS
+            {"stride_d1", {8}},
+            {"stride_d2", {8*64}},
+            {"stride_d3", {8*64*64}},
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"D1", 8},            
+            {"D2", 64},
+            {"D3", 64},
+            {"D4", 128}
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_tensorunfold,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "tensor_slicing",                //  Benchmark
+        {                               // CONSTANTS
+            {"stride_n1", {2}},
+            {"stride_h1", {4}},
+            {"stride_w1", {2}},
+            {"stride_c1", {64}},
+            {"stride_d1", {512}},
+            {"stride_d2", {512*64}},
+            {"stride_d3", {512*64*64}},
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"D1", 512},            
+            {"D2", 64},
+            {"D3", 64},
+            {"D4", 8}
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_tensorslice,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
     {
         "im2col",                       //  Benchmark
         {                               // CONSTANTS
@@ -323,54 +370,6 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"ksize", 2}
         },
         bench_wrapper_batch2space, // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-
-        {
-        "tensor_unfold",                //  Benchmark
-        {                               // CONSTANTS
-            {"stride_d1", {8}},
-            {"stride_d2", {8*64}},
-            {"stride_d3", {8*64*64}},
-            {"data_size", {4}}
-        },
-        {                               // LOOP PARAMETERS
-            {"D1", 8},            
-            {"D2", 64},
-            {"D3", 64},
-            {"D4", 128}
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_tensorunfold,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-
-    {
-        "tensor_slicing",                //  Benchmark
-        {                               // CONSTANTS
-            {"stride_n1", {2}},
-            {"stride_h1", {4}},
-            {"stride_w1", {2}},
-            {"stride_c1", {64}},
-            {"stride_d1", {512}},
-            {"stride_d2", {512*64}},
-            {"stride_d3", {512*64*64}},
-            {"data_size", {4}}
-        },
-        {                               // LOOP PARAMETERS
-            {"D1", 512},            
-            {"D2", 64},
-            {"D3", 64},
-            {"D4", 8}
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_tensorslice,    // bench function
         "",                             // artifact in
         ""                              // artifact out
     },

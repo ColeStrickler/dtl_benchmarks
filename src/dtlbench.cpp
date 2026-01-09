@@ -588,6 +588,7 @@ int main(int argc, char* argv[]) {
   {
     printf("calling bench\n");
     std::cout << bench.benchmark(bench, api);
+    api->DebugPrintAllocator();
   }
 
 
