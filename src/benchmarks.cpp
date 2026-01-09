@@ -508,3 +508,184 @@ std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data
 
     return results;
 }
+
+std::string benchmark::bench_wrapper_tensorunfold(const BenchmarkData &bench_data, DTL::API *api) 
+{
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+    assert(bench_data.params.find("D1") != bench_data.params.end());
+    assert(bench_data.params.find("D2") != bench_data.params.end());
+    assert(bench_data.params.find("D3") != bench_data.params.end());
+    assert(bench_data.params.find("D4") != bench_data.params.end());
+    assert(bench_data.constants.find("stride_d1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d2") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d3") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+
+    int d1 = bench_data.params.at("D1");
+    int d2 = bench_data.params.at("D2");
+    int d3 = bench_data.params.at("D3");
+    int d4 = bench_data.params.at("D4");
+    int stride_d1 = bench_data.constants.at("stride_d1")[0];
+    int stride_d2 = bench_data.constants.at("stride_d2")[0];
+    int stride_d3 = bench_data.constants.at("stride_d3")[0];
+
+    int* tensor_in = new int[d1*d2*d3*d4];
+    int* lowered_mat = new int[d1*d2*d3*d4];
+    int* tensor_out1 = new int[d1*d2*d3*d4];
+    int* tensor_out2 = new int[d1*d2*d3*d4];
+    int* matrix_b = new int[d1*d2*d3*d4];
+    int* matrix_b2 = new int[d1*d2*d3*d4];
+
+
+    assert(tensor_in != nullptr);
+    assert(lowered_mat != nullptr);
+    assert(tensor_out1 != nullptr);
+    assert(tensor_out2 != nullptr);
+    assert(matrix_b != nullptr);
+    assert(matrix_b2 != nullptr);
+
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_in), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b), d1*d2*d3*d4*sizeof(int));
+
+    std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
+
+
+    perf.CollectCounters();
+    lower_mat_4d(lowered_mat, tensor_in, d1, d2, d4, d4, stride_d1, stride_d2, stride_d3);
+    hadamard(tensor_out1, lowered_mat, matrix_b, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    int* Aw = (int*)ephemeral->GetHeadlessWriteregion();
+    int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b2), d1*d2*d3*d4*sizeof(int));
+
+
+    perf.CollectCounters();
+    hadamard(tensor_out2, Ar, matrix_b2, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    printf("%s\n", results.c_str());
+    //delete[] tensor_in;
+    printf("a\n");
+    delete[] lowered_mat; 
+    printf("b\n");
+    delete[] tensor_out1;
+    printf("c\n");  
+    delete[] tensor_out2;
+    printf("d\n");
+    delete[] matrix_b;
+    printf("e\n"); 
+    delete[] matrix_b2; 
+    printf("f\n");
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+}
+
+std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data, DTL::API *api) 
+{
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+    assert(bench_data.params.find("D1") != bench_data.params.end());
+    assert(bench_data.params.find("D2") != bench_data.params.end());
+    assert(bench_data.params.find("D3") != bench_data.params.end());
+    assert(bench_data.params.find("D4") != bench_data.params.end());
+    assert(bench_data.constants.find("stride_n1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_h1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_w1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_c1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d2") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d3") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+    int d1 = bench_data.params.at("D1");
+    int d2 = bench_data.params.at("D2");
+    int d3 = bench_data.params.at("D3");
+    int d4 = bench_data.params.at("D4");
+    int stride_d1 = bench_data.constants.at("stride_d1")[0];
+    int stride_d2 = bench_data.constants.at("stride_d2")[0];
+    int stride_d3 = bench_data.constants.at("stride_d3")[0];
+
+    int stride_n1 = bench_data.constants.at("stride_n1")[0];
+    int stride_h1 = bench_data.constants.at("stride_h1")[0];
+    int stride_w1 = bench_data.constants.at("stride_w1")[0];
+    int stride_c1 = bench_data.constants.at("stride_c1")[0];
+
+    int n1 = d4 / stride_n1;
+    int h1 = d3 / stride_h1;
+    int w1 = d2 / stride_w1;
+    int c1 = d1 / stride_c1;   
+
+
+    int* tensor_in = new int[d1*d2*d3*d4];
+    int* sliced_tensor = new int[n1*h1*w1*c1];
+    int* tensor_out1 = new int[n1*h1*w1*c1];
+    int* tensor_out2 = new int[n1*h1*w1*c1];
+    int* tensor_b = new int[n1*h1*w1*c1];
+    int* tensor_b2 = new int[n1*h1*w1*c1];
+    assert(tensor_in != nullptr);
+    assert(sliced_tensor != nullptr);
+    assert(tensor_out1 != nullptr);
+    assert(tensor_out2 != nullptr);
+    assert(tensor_b != nullptr);
+    assert(tensor_b2 != nullptr);
+
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_in), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_b), n1*h1*w1*c1*sizeof(int));
+
+    std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
+    tensor_info += " _" + std::to_string(stride_n1) + "x" + std::to_string(stride_h1) + "x" + std::to_string(stride_w1) + "x" + std::to_string(stride_c1);
+
+    perf.CollectCounters();
+    slice_tensor_int(sliced_tensor, tensor_in, n1, h1, w1, c1, stride_n1, stride_h1, stride_w1, stride_c1, stride_d1, stride_d2, stride_d3);
+    hadamard_tensor_4d_int(tensor_out1, sliced_tensor, tensor_b, n1, h1, w1, c1);
+    perf.CollectDelta();
+    results += "tensor_slicing_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    int* Aw = (int*)ephemeral->GetHeadlessWriteregion();
+    int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_b2), n1*h1*w1*c1*sizeof(int));
+
+
+    perf.CollectCounters();
+    hadamard_tensor_4d_int(tensor_out2, Ar, tensor_b2, n1, h1, w1, c1);
+    perf.CollectDelta();
+    results += "tensor_slicing_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+
+    delete[] tensor_in;
+    delete[] sliced_tensor; 
+    delete[] tensor_out1;     
+    delete[] tensor_out2;
+    delete[] tensor_b; 
+    delete[] tensor_b2; 
+
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+}

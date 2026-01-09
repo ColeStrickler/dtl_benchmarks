@@ -618,3 +618,34 @@ void matmul_opt5_recursive_pretranspose(TYPE* a, TYPE*  b, TYPE* c, size_t size,
     free(intermediate_result);
   }
 }
+
+void hadamard(int *out, int *a, int *b, int height, int width)
+{
+    for (int h = 0; h < height; h++)
+    {
+        for (int w = 0; w < width; w++)
+        {
+            out[h*width + w] = a[h*width + w] * b[h*width + w];
+        }
+    }
+}
+
+void hadamard_tensor_4d_int(int *out, int *a, int *b, int d4, int d3, int d2, int d1)
+{
+    int i = 0; 
+    for (int n = 0; n < d4; n++)
+    {
+        for (int h = 0; h < d3; h++)
+        {
+            for (int w = 0; w < d2; w++)
+            {
+                for (int c = 0; c < d1; c++)
+                {
+                    out[i] = a[i] * b[i];
+                    i++;
+                }
+            }
+        }
+    }
+}
+

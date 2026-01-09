@@ -18,7 +18,8 @@
 #include "matmul.hpp"
 #include "tensor_permutation.hpp"
 #include "batch2space.hpp"
-
+#include "unfold.hpp"
+#include "slicing.hpp"
 
 namespace benchmark
 {
@@ -45,8 +46,8 @@ std::string bench_wrapper_db_colproject(const BenchmarkData& bench_data, DTL::AP
 std::string bench_wrapper_matmul_transpose(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_nhwc_permutation(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_batch2space(const BenchmarkData& bench_data, DTL::API* api);
-std::string bench_wrapper_tensorslice(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_tensorunfold(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_tensorslice(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_highdim_stencil(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_multigrid(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_haar_wavelet(const BenchmarkData& bench_data, DTL::API* api);
@@ -326,6 +327,53 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
         ""                              // artifact out
     },
 
+        {
+        "tensor_unfold",                //  Benchmark
+        {                               // CONSTANTS
+            {"stride_d1", {8}},
+            {"stride_d2", {8*64}},
+            {"stride_d3", {8*64*64}},
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"D1", 8},            
+            {"D2", 64},
+            {"D3", 64},
+            {"D4", 128}
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_tensorunfold,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "tensor_slicing",                //  Benchmark
+        {                               // CONSTANTS
+            {"stride_n1", {2}},
+            {"stride_h1", {4}},
+            {"stride_w1", {2}},
+            {"stride_c1", {64}},
+            {"stride_d1", {512}},
+            {"stride_d2", {512*64}},
+            {"stride_d3", {512*64*64}},
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"D1", 512},            
+            {"D2", 64},
+            {"D3", 64},
+            {"D4", 8}
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_tensorslice,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
 
 };
 
@@ -354,6 +402,79 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataLong = {
         "",                             // artifact in
         ""                              // artifact out
     },
+
+       {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {64}},         
+            {"col_offsets", {4, 8, 16, 24, 28, 32, 40, 48, 52, 56, 60}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 442368},            
+            {"COLUMNS", 11},
+        },
+        {                               // OTHER
+  
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {64}},         
+            {"col_offsets", {4, 32, 48}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 442368},            
+            {"COLUMNS", 3},
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {512}},         
+            {"col_offsets", {104, 256, 444}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 442368},            
+            {"COLUMNS", 3},
+        },
+        {                               // OTHER
+  
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "db_col_project",               //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {512}},         
+            {"col_offsets", {4, 64, 120, 164, 256, 312, 368, 400, 444, 488, 500}},
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 442368},            
+            {"COLUMNS", 11},
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_db_colproject,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
 
 };
 

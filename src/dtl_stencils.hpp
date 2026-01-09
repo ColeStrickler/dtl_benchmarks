@@ -78,7 +78,43 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                         )"
     },
 
-                    
+    {"tensor_unfold", \
+                        R"(
+                            for (int i = 0; i < [D3]; i++)
+                            {
+                                for (int j = 0; j < [D4]; j++)
+                                {
+                                    for (int k = 0; k < [D2]; k++)
+                                    {
+                                        for (int l = 0; l < [D1]; l++)
+                                        {
+                                            out = l*data_size + k*(stride_d1*data_size) + j*(stride_d3*data_size) + i*(stride_d2*data_size);
+                                        }
+                                    }
+                                }
+                            }
+                        )"
+    },
+
+    
+    {"tensor_slicing", \
+                        R"(
+                            for (int i = 0; i < [D4]; i++)
+                            {
+                                for (int j = 0; j < [D3]; j++)
+                                {
+                                    for (int k = 0; k < [D2]; k++)
+                                    {
+                                        for (int l = 0; l < [D1]; l++)
+                                        {
+                                            out = l*(stride_c1*data_size) + j*(stride_d1*stride_w1*data_size) + k*(stride_h1*stride_d2*data_size) + i*(stride_n1*stride_d3);
+                                        }
+                                    }
+                                }
+                            }
+                        )"
+    },
+
 
 
 };

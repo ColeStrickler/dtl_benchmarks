@@ -78,4 +78,8 @@ void matmult_opt3_pretransposed(float *A, float* bt, float *C, int dimension);
 void matmult_dtl_transposed_tile(size_t size, size_t tile_size, size_t inner_tile_size, float* a, float*  b, float*  c);
 void matmul_opt4_recursive(TYPE*  a, TYPE*  b, TYPE* c, const size_t size, size_t threshold);
 void matmul_opt5_recursive_pretranspose(TYPE* a, TYPE*  b, TYPE* c, size_t size, size_t threshold);
+
+void hadamard(int* out, int* a, int* b, int height, int width);
+
+void hadamard_tensor_4d_int(int* out, int* a, int* b, int d4, int d3, int d2, int d1);
 #endif
