@@ -689,3 +689,200 @@ std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data
     api->FreeEphemeralRegion(ephemeral);
     return results;
 }
+
+std::string benchmark::bench_wrapper_highdim_stencil(const BenchmarkData &bench_data, DTL::API *api) 
+{
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+    assert(bench_data.params.find("NY_MINUS_1") != bench_data.params.end());
+    assert(bench_data.params.find("NX_MINUS_1") != bench_data.params.end());
+    assert(bench_data.params.find("NZ_MINUS_1") != bench_data.params.end());
+    assert(bench_data.constants.find("stride_nx") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_ny") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+
+    int ny = 1 + bench_data.params.at("NY_MINUS_1");
+    int nx = 1 + bench_data.params.at("NX_MINUS_1");
+    int nz = 1 + bench_data.params.at("NZ_MINUS_1");
+
+    std::string tensor_info = std::to_string(nx) + "x" + std::to_string(ny) + "x" + std::to_string(nz);
+
+    float* base_tensor = new float[ny*nx*nz];
+    float* new_tensor = new float[ny*nx*nz];
+    float* new_tensor2 = new float[ny*nx*nz];
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(base_tensor), ny*nx*nz*sizeof(float));
+
+
+    perf.CollectCounters();
+    highdim_7stencil_cpu(base_tensor, new_tensor, nx, ny, nz);
+    perf.CollectDelta();
+    results += "highdim_7stencil_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+
+
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(8*nx*ny*nz*sizeof(float));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    float* Aw = (float*)ephemeral->GetHeadlessWriteregion();
+    float* Ar = (float*)ephemeral->GetHeadlessReadRegion();
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), ny*nx*nz*sizeof(float));
+
+    //printf("dtu start\n");
+    perf.CollectCounters();
+    highdim_7stencil_dtu(Ar, new_tensor2, nx, ny, nz);
+    perf.CollectDelta();
+    //printf("done\n");
+    results += "highdim_7stencil_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    //printf("%s\n", results.c_str());
+
+
+    delete[] base_tensor;
+    delete[] new_tensor;
+    delete[] new_tensor2;
+
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+}
+
+std::string benchmark::bench_wrapper_multigrid(const BenchmarkData &bench_data, DTL::API *api) {
+  return std::string();
+}
+
+std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data, DTL::API *api) {
+#define CUBE_ACCESS(i, a, x, y, z) (i*ncubes*CUBE_SIZE + a*CUBE_SIZE + x*CUBE_2D + y*CUBE_DIM + z)
+#define S_CUBE_ACCESS(x, y, z) (x*CUBE_2D + y*CUBE_DIM + z)
+#define TENSOR_COORD4(w, x, y, z) (((w)*d3*d2*d1) + ((x)*d2*d1) + ((y)*d1) + (z))
+#define TENSOR_COORD3(x, y, z) (((x)*d2*d1) + ((y)*d1) + (z))
+#define CUBE_SIZE (cube_dim*cube_dim*cube_dim)
+#define CUBE_2D (cube_dim*cube_dim)
+#define CUBE_DIM (cube_dim)
+
+    /*
+        This benchmark is a bit more complicated, so we create the config on the fly first
+    */
+
+    assert(bench_data.other.find("d4") != bench_data.other.end());
+    assert(bench_data.other.find("d3") != bench_data.other.end());
+    assert(bench_data.other.find("d2") != bench_data.other.end());
+    assert(bench_data.other.find("d1") != bench_data.other.end());
+    assert(bench_data.other.find("CUBE_DIM") != bench_data.other.end());
+    assert(bench_data.constants.find("data_size")   != bench_data.constants.end());
+    assert(bench_data.params.find("N_3DSTRUCT")     != bench_data.params.end());
+    assert(bench_data.params.find("NCUBES")         != bench_data.params.end());
+    assert(bench_data.params.find("CUBE_DIM1")      != bench_data.params.end());
+    assert(bench_data.params.find("CUBE_DIM2")      != bench_data.params.end());
+    assert(bench_data.params.find("CUBE_DIM3")      != bench_data.params.end());
+
+    int ncubes = bench_data.params.at("NCUBES");
+    assert(ncubes == 8); // all we want to support right now
+    int cube_dim = bench_data.other.at("CUBE_DIM");
+    int d4 = bench_data.other.at("d4");
+    int d3 = bench_data.other.at("d3");
+    int d2 = bench_data.other.at("d2");
+    int d1 = bench_data.other.at("d1");
+    int data_size = bench_data.constants.at("data_size")[0];
+
+    BenchmarkData nBenchData = bench_data;
+    nBenchData.constants.insert({"stride_d3", BenchParam{static_cast<uint32_t>(d3*d2*d1)}});
+    nBenchData.constants.insert({"stride_d2", BenchParam{static_cast<uint32_t>(d2*d1)}});
+    nBenchData.constants.insert({"stride_d1", BenchParam{static_cast<uint32_t>(d1)}});
+    
+    std::vector<int> cube_locs = {TENSOR_COORD3(0, 0, 0), TENSOR_COORD3(0, d2-CUBE_DIM, 0), TENSOR_COORD3(0, 0, d1-CUBE_DIM),\
+                        TENSOR_COORD3(d3-CUBE_DIM, 0, 0), TENSOR_COORD3(d3-CUBE_DIM, d2-CUBE_DIM, 0), TENSOR_COORD3(d3-CUBE_DIM, 0, d1-CUBE_DIM),\
+                        TENSOR_COORD3(0, d2-CUBE_DIM, d1-CUBE_DIM), TENSOR_COORD3(d3-CUBE_DIM, d2-CUBE_DIM, d1-CUBE_DIM)};  
+    BenchParam cube_loc_param;
+    for (auto& loc: cube_locs)
+        cube_loc_param.push_back(static_cast<uint32_t>(loc*data_size));
+    nBenchData.constants["cube_locs"] = cube_loc_param;
+
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+    printf("conf:\n%s\n", conf.c_str());
+    
+    std::string tensor_info = std::to_string(d4) + "x" + std::to_string(d3) + "x" + std::to_string(d2)  + "x" + std::to_string(d1);
+    
+    int* in_tensor = new int[d4*d3*d2*d1];
+    int* out_tensor1 = new int[d4*ncubes*CUBE_SIZE];
+    int* filter_tensor1 = new int[d4*ncubes*CUBE_SIZE];
+    int* filter_tensor2 = new int[d4*ncubes*CUBE_SIZE];
+    int* filter = new int[CUBE_SIZE];
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(filter), CUBE_SIZE*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(in_tensor), d4*d3*d2*d1*sizeof(int));
+
+    perf.CollectCounters();
+    cube_stencil_8corner_cpu(in_tensor, out_tensor1, d4, d3, d2, d1, CUBE_DIM);
+    // apply filter to cubes, write to result
+    for (int i = 0; i < d4; i++) {
+        for (int a = 0; a < ncubes; a++) {
+            for (int x = 0; x < CUBE_DIM; x++) {
+                for (int y = 0; y < CUBE_DIM; y++) {
+                    for (int z = 0; z < CUBE_DIM; z++) {
+                        filter_tensor1[CUBE_ACCESS(i, a, x, y, z)] = filter[S_CUBE_ACCESS(x,y,z)] * out_tensor1[CUBE_ACCESS(i, a, x, y, z)];
+                    }
+                }
+            }
+        }
+    }
+    perf.CollectDelta();
+    results += "cubestencil_8corner_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+
+
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    int* Aw = (int*)ephemeral->GetHeadlessWriteregion();
+    int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), d1*d2*d3*d4*sizeof(int));
+
+    //printf("dtu start\n");
+    perf.CollectCounters();
+    // DTU already extracts cubes, we just apply filter and write out
+    // apply filter to cubes, write to result
+    for (int i = 0; i < d4; i++) {
+        for (int a = 0; a < ncubes; a++) {
+            for (int x = 0; x < CUBE_DIM; x++) {
+                for (int y = 0; y < CUBE_DIM; y++) {
+                    for (int z = 0; z < CUBE_DIM; z++) {
+                        filter_tensor2[CUBE_ACCESS(i, a, x, y, z)] = filter[S_CUBE_ACCESS(x,y,z)] * Ar[CUBE_ACCESS(i, a, x, y, z)];
+                    }
+                }
+            }
+        }
+    }
+
+    perf.CollectDelta();
+    //printf("done\n");
+    results += "cubestencil_8corner_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+
+    delete[] in_tensor;
+    delete[] filter_tensor1;
+    delete[] filter_tensor2;
+    delete[] out_tensor1;
+    delete[] filter;
+
+#undef TENSOR_COORD4
+#undef TENSOR_COORD3
+#undef CUBE_SIZE
+#undef CUBE_DIM
+#undef CUBE_ACCESS
+#undef S_CUBE_ACCESS
+
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+
+}

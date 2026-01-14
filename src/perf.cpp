@@ -1,8 +1,29 @@
 #include "perf.hpp"
 
-PerfManager::PerfManager() {}
+PerfManager::PerfManager() 
+{
+#ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
+    m_CacheMMIOFd = open_fd();
+    if (m_CacheMMIOFd == -1)
+    {
+        printf("PerfManager::PerfManager() Could not open /dev/mem\n");
+        exit(-1);
+        return;
+    }
 
-PerfManager::~PerfManager() {}
+    auto control_region_size = 0x1000;
+    printf("AGUControlRegionSize: 0x%x\n", control_region_size);
+    m_ControlRegionBase = (uint64_t)mmap(NULL, control_region_size, PROT_READ | PROT_WRITE, MAP_SHARED, m_CacheMMIOFd, LLC_PERF_BASE);
+#endif
+}
+
+PerfManager::~PerfManager()
+{
+#ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
+    close(m_CacheMMIOFd);
+    munmap((void*)m_ControlRegionBase, 0x1000);
+#endif
+}
 
 //#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 
@@ -107,8 +128,8 @@ void PerfManager::CollectCounters() {
 
     // do MMIO reads last
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    m_Counters.m_LLCAccessCount = READ_UINT64(LLC_ACCESS_COUNT);
-    m_Counters.m_LLCMissCounter = READ_UINT64(LLC_MISS_COUNT);
+    m_Counters.m_LLCAccessCount = READ_LLC_ACCESS_COUNT(m_ControlRegionBase);
+    m_Counters.m_LLCMissCounter =  READ_LLC_MISS_COUNT(m_ControlRegionBase);
 #endif
 }
 
@@ -135,8 +156,8 @@ void PerfManager::CollectDelta()
 
         // do MMIO reads last
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    m_Counters.m_LLCAccessCount = READ_UINT64(LLC_ACCESS_COUNT) - m_Counters.m_LLCAccessCount;
-    m_Counters.m_LLCMissCounter = READ_UINT64(LLC_MISS_COUNT) - m_Counters.m_LLCMissCounter;
+    m_Counters.m_LLCAccessCount = READ_LLC_ACCESS_COUNT(m_ControlRegionBase) - m_Counters.m_LLCAccessCount;
+    m_Counters.m_LLCMissCounter = READ_LLC_MISS_COUNT(m_ControlRegionBase) - m_Counters.m_LLCMissCounter;
 #endif
 
 }

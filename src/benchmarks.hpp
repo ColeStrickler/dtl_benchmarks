@@ -20,6 +20,8 @@
 #include "batch2space.hpp"
 #include "unfold.hpp"
 #include "slicing.hpp"
+#include "highdim_stencil.hpp"
+#include "cube_stencil.hpp"
 
 namespace benchmark
 {
@@ -72,7 +74,30 @@ std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 */
 
 static std::vector<BenchmarkData> BenchmarkDispatchData = {
-        {
+    {
+        "cube_stencil_8corner",         //  Benchmark
+        {                               // CONSTANTS
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"N_3DSTRUCT", 64}, // 4th dimension
+            {"NCUBES", 8},         // how many total cubes we get per 4th dim
+            {"CUBE_DIM1", 3},
+            {"CUBE_DIM2", 3},
+            {"CUBE_DIM3", 3}
+        },
+        {                               // OTHER
+            {"d4", 64},
+            {"d3", 64},
+            {"d2", 64},
+            {"d1", 64},
+            {"CUBE_DIM", 3},
+        },
+        bench_wrapper_cubestencil,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
         "tensor_unfold",                //  Benchmark
         {                               // CONSTANTS
             {"stride_d1", {8}},
@@ -374,6 +399,26 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
         ""                              // artifact out
     },
 
+    {
+        "highdim_7stencil",             //  Benchmark
+        {                               // CONSTANTS
+            {"stride_nx", {256*128}},
+            {"stride_ny", {128}},
+            {"data_size", {4}}
+        },
+        {                               // LOOP PARAMETERS
+            {"NX_MINUS_1", 127},            
+            {"NY_MINUS_1", 255},
+            {"NZ_MINUS_1", 127},
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_highdim_stencil,  // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
 };
 
 
@@ -402,7 +447,7 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataLong = {
         ""                              // artifact out
     },
 
-       {
+    {
         "db_col_project",               //  Benchmark
         {                               // CONSTANTS
             {"row_size", {64}},         
@@ -432,41 +477,6 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataLong = {
         },
         {                               // OTHER
     
-        },
-        bench_wrapper_db_colproject,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-
-    {
-        "db_col_project",               //  Benchmark
-        {                               // CONSTANTS
-            {"row_size", {512}},         
-            {"col_offsets", {104, 256, 444}},
-        },
-        {                               // LOOP PARAMETERS
-            {"ROWS", 442368},            
-            {"COLUMNS", 3},
-        },
-        {                               // OTHER
-  
-        },
-        bench_wrapper_db_colproject,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-    {
-        "db_col_project",               //  Benchmark
-        {                               // CONSTANTS
-            {"row_size", {512}},         
-            {"col_offsets", {4, 64, 120, 164, 256, 312, 368, 400, 444, 488, 500}},
-        },
-        {                               // LOOP PARAMETERS
-            {"ROWS", 442368},            
-            {"COLUMNS", 11},
-        },
-        {                               // OTHER
-
         },
         bench_wrapper_db_colproject,    // bench function
         "",                             // artifact in

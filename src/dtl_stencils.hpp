@@ -115,8 +115,47 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                         )"
     },
 
+    {"highdim_7stencil", \
+                        R"(
+                            for (int i = 0; i < [NX_MINUS_1]; i++)
+                            {
+                                for (int j = 0; j < [NY_MINUS_1]; j++)
+                                {
+                                    for (int k = 0; k < [NZ_MINUS_1]; j++)
+                                    {
+                                        out = (i+1)*(stride_nx*data_size) + (j+1)*(stride_ny*data_size) + (data_size*k+data_size);
+                                        out = (i+(1))*(stride_nx*data_size) + (j+(1+1))*(stride_ny*data_size) + ((k+1)*data_size);
+                                        out = (i+(1))*(stride_nx*data_size) + (j)*(stride_ny*data_size) + ((k+1)*data_size);
+                                        out = (i+(1))*(stride_nx*data_size) + (j+(1))*(stride_ny*data_size) + (k+(1+1))*data_size;
+                                        out = (i+(1))*(stride_nx*data_size) + (j+(1))*(stride_ny*data_size) + ((k)*data_size);
+                                        out = (i+(1+1))*(stride_nx*data_size) + (j+(1))*(stride_ny*data_size) + ((k+1)*data_size);
+                                        out = (i)*(stride_nx*data_size) + (j+(1))*(stride_ny*data_size) + ((k+1)*data_size);
+                                    }
+                                }
+                            }
+                        )"
+    },
 
-
+    {"cube_stencil_8corner", \
+                    R"(
+                        for (int i = 0; i < [N_3DSTRUCT]; i++)
+                        {
+                            for (int a = 0; a < [NCUBES]; a++)
+                            {
+                                for (int x = 0; x < [CUBE_DIM1]; x++)
+                                {
+                                    for (int y = 0; y < [CUBE_DIM2]; y++)
+                                    {
+                                        for (int z = 0; z < [CUBE_DIM3]; z++)
+                                        {
+                                            out = cube_locs[a] + (i*(stride_d3*data_size) + x*(stride_d2*data_size)) + (y*(stride_d1*data_size) + z*data_size);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    )"
+    },
 };
 
 

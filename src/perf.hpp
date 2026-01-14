@@ -3,6 +3,14 @@
 #include <stdint.h>
 #include <string>
 
+#include <fcntl.h> 
+#include <sys/mman.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+
+
+#include "util.hpp"
+
 #ifndef ACCESS_HELPERS
 #define ACCESS_HELPERS
 #define WRITE_BOOL(addr, value)(*(bool*)(addr) = value)
@@ -23,6 +31,7 @@
 
 //#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 #define INCLUDE_BOOM_PERF_EXTRA
+#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 /*
     Custom intra-core counters for the boom core
 */
@@ -41,8 +50,11 @@
 #endif
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-#define LLC_ACCESS_COUNT 0x3010000 // SET TO ACTUAL
-#define LLC_MISS_COUNT 0x3010008
+#define LLC_PERF_BASE 0x2010000
+#define LLC_ACCESS_COUNT 0x608      // SET TO ACTUAL
+#define LLC_MISS_COUNT 0x600
+#define READ_LLC_ACCESS_COUNT(base) (READ_UINT64(base + LLC_ACCESS_COUNT))
+#define READ_LLC_MISS_COUNT(base) (READ_UINT64(base + LLC_MISS_COUNT))
 #endif
 
 
@@ -128,7 +140,9 @@ public:
     */
 
 private:
+    uint64_t m_ControlRegionBase;
     RocketChipCounters m_Counters;
+    int m_CacheMMIOFd;
 };
 
 #endif
