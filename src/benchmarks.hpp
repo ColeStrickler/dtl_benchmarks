@@ -65,7 +65,7 @@ std::string bench_wrapper_multithread_SoA(const BenchmarkData& bench_data, DTL::
 std::string InsertDTLConfigParameters(const BenchmarkData& benchmark_data);
 std::string CreateConstants(const std::unordered_map<std::string, BenchParam>& constants);
 std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
-
+std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
 
 
 

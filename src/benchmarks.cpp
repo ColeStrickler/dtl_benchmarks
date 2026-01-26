@@ -55,6 +55,16 @@ std::string benchmark::CreateBenchmarkConfig(const BenchmarkData &benchmark_data
     return constants + "\n"+ config_body;
 }
 
+std::string benchmark::CreateBenchmarkConfig2(BenchmarkData benchmark_data)
+{
+    std::string constants = CreateConstants(benchmark_data.constants);
+    std::string config_body = InsertDTLConfigParameters(benchmark_data);
+
+    return constants + "\n"+ config_body;
+}
+
+
+
 std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data, DTL::API* api)
 {
     printf("here\n");
@@ -107,13 +117,11 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data, DTL
 
 
     // CPU benchmark
-    printf("startingf im2col_cpu\n");
     perf.CollectCounters();
     im2col_cpu(in_data, channels_in, height, width, ksize, stride, pad, im2col_cpu_matrix);
-    printf("im2col done\n");
     matmult_conv_blocked(filter_matrix, im2col_cpu_matrix, outbuf, M, K, N);
     perf.CollectDelta();
-    results += "im2col_cpu_" + img_info + "," + perf.PrintCounters() + "\n";
+    results += "im2col_" + img_info + "," + "cpu," + perf.PrintCounters() + "," + std::to_string(print_checksum_l(im2col_cpu_matrix, im2col_matsize))  + "\n";
     printf("done cpu\n");
     if (bench_data.output_artifact.size())
         dump_buffer_to_disk("./artifacts/im2col_cpu_" + img_info, reinterpret_cast<unsigned char*>(outbuf), out_height*out_width*channels_out*sizeof(float));
@@ -138,7 +146,7 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data, DTL
     matmult_conv_blocked(filter_matrix, Ar, outbuf2, M, K, N);
     perf.CollectDelta();
 
-    results += "im2col_dtu_" + img_info + "," + perf.PrintCounters() + "\n";
+    results += "im2col_" + img_info + "," + "dtu," + perf.PrintCounters() + "," + std::to_string(print_checksum_l(Ar, im2col_matsize))  + "\n";
     if (bench_data.output_artifact.size())
         dump_buffer_to_disk("./artifacts/im2col_dtu_" + img_info, reinterpret_cast<unsigned char*>(outbuf2), out_height*out_width*channels_out*sizeof(float));
 
@@ -195,7 +203,7 @@ std::string benchmark::bench_wrapper_db_colproject(const BenchmarkData &bench_da
         }
     }
     perf.CollectDelta();
-    results += "dbcolproj_cpu_" + db_info + "," + perf.PrintCounters() + "\n";
+    results += "dbcolproj_" + db_info + "," + "cpu," + perf.PrintCounters() + "," + print_checksum_ul(write_out1, col_count*row_count) + "\n";
 
     perf.ClearCounters();
     DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(db_size);
@@ -220,8 +228,7 @@ std::string benchmark::bench_wrapper_db_colproject(const BenchmarkData &bench_da
         }
     }
     perf.CollectDelta();
-    std::string counters = perf.PrintCounters();
-    results += "dbcolproj_dtu_" + db_info + "," + counters + "\n";
+    results += "dbcolproj_" + db_info + "," + "dtu," + perf.PrintCounters()  + "," + print_checksum_ul(write_out2, col_count*row_count) + "\n";
 
 
 
@@ -264,7 +271,7 @@ std::string benchmark::bench_wrapper_matmul_transpose(const BenchmarkData &bench
     transpose_naive_int(B, Bt, nrows, ncols);
     matmult_opt3_pretransposed_int(A, Bt, C1, nrows);
     perf.CollectDelta();
-    results += "matmul_transpose_cpu_" + mat_info + "," + perf.PrintCounters() + "\n";
+    results += "matmul_transpose_" + mat_info + "," + "cpu," + perf.PrintCounters()  + "," + print_checksum_i32(Bt, nrows*ncols) + "\n";
 
 
     perf.ClearCounters();
@@ -279,11 +286,13 @@ std::string benchmark::bench_wrapper_matmul_transpose(const BenchmarkData &bench
     int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
 
     init_data_int(A, Aw, C2, nrows);
-
     perf.CollectCounters();
     matmult_opt3_pretransposed_int(A, Ar, C2, nrows);
     perf.CollectDelta();
-    results += "matmul_transpose_dtu_" + mat_info + "," + perf.PrintCounters() + "\n";
+
+
+
+    results += "matmul_transpose_" + mat_info + "," + "dtu," + perf.PrintCounters()   + "," + print_checksum_i32(Ar, nrows*ncols) + "\n";
 
 
 
@@ -354,7 +363,7 @@ std::string benchmark::bench_wrapper_nhwc_permutation(const BenchmarkData &bench
         }
     }  
     perf.CollectDelta();
-    results += "nhwc_permutation_cpu_" + img_info + "," + perf.PrintCounters() + "\n";
+    results += "nhwc_permutation_" + img_info + "," + "cpu," + perf.PrintCounters() + "," + std::to_string(print_checksum(img_nchw, batch_size*img_size*img_size*channels)) + "\n";
 
 
     
@@ -387,7 +396,7 @@ std::string benchmark::bench_wrapper_nhwc_permutation(const BenchmarkData &bench
         }
     }  
     perf.CollectDelta();
-    results += "nhwc_permutation_dtu_" + img_info + "," + perf.PrintCounters() + "\n";
+    results += "nhwc_permutation_" + img_info + "," + "dtu," + perf.PrintCounters() + "," + std::to_string(print_checksum(Ar, batch_size*img_size*img_size*channels)) + "\n";
 
 
 
@@ -461,7 +470,7 @@ std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data
         }
     }  
     perf.CollectDelta();
-    results += "batch2space_cpu_" + img_info + "," + perf.PrintCounters() + "\n";
+    results += "batch2space_" + img_info + "," + "cpu," + perf.PrintCounters()  + "," + std::to_string(print_checksum(img_batch_transform, batch_size*img_size*img_size*channels)) + "\n";
 
 
     
@@ -494,7 +503,7 @@ std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data
         }
     }  
     perf.CollectDelta();
-    results += "batch2space_dtu_" + img_info + "," + perf.PrintCounters() + "\n";
+    results += "batch2space_" + img_info + "," + "dtu," + perf.PrintCounters() + "," + std::to_string(print_checksum(Ar, batch_size*img_size*img_size*channels)) + "\n";
 
 
 
@@ -558,7 +567,7 @@ std::string benchmark::bench_wrapper_tensorunfold(const BenchmarkData &bench_dat
     lower_mat_4d(lowered_mat, tensor_in, d1, d2, d4, d4, stride_d1, stride_d2, stride_d3);
     hadamard(tensor_out1, lowered_mat, matrix_b, d3, d1*d2*d4);
     perf.CollectDelta();
-    results += "tensor_unfold_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "tensor_unfold_" + tensor_info + "," + "cpu," + perf.PrintCounters()  + "," + print_checksum_i32(lowered_mat, d1*d2*d3*d4) + "\n";
 
     perf.ClearCounters();
     DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
@@ -578,20 +587,14 @@ std::string benchmark::bench_wrapper_tensorunfold(const BenchmarkData &bench_dat
     perf.CollectCounters();
     hadamard(tensor_out2, Ar, matrix_b2, d3, d1*d2*d4);
     perf.CollectDelta();
-    results += "tensor_unfold_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "tensor_unfold_" + tensor_info + "," + "dtu," + perf.PrintCounters()   + "," + print_checksum_i32(Ar, d1*d2*d3*d4) + "\n";
     printf("%s\n", results.c_str());
     //delete[] tensor_in;
-    printf("a\n");
     delete[] lowered_mat; 
-    printf("b\n");
     delete[] tensor_out1;
-    printf("c\n");  
     delete[] tensor_out2;
-    printf("d\n");
     delete[] matrix_b;
-    printf("e\n"); 
     delete[] matrix_b2; 
-    printf("f\n");
     api->FreeEphemeralRegion(ephemeral);
     return results;
 }
@@ -651,13 +654,13 @@ std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data
     randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_b), n1*h1*w1*c1*sizeof(int));
 
     std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
-    tensor_info += " _" + std::to_string(stride_n1) + "x" + std::to_string(stride_h1) + "x" + std::to_string(stride_w1) + "x" + std::to_string(stride_c1);
+    tensor_info += "_" + std::to_string(stride_n1) + "x" + std::to_string(stride_h1) + "x" + std::to_string(stride_w1) + "x" + std::to_string(stride_c1);
 
     perf.CollectCounters();
     slice_tensor_int(sliced_tensor, tensor_in, n1, h1, w1, c1, stride_n1, stride_h1, stride_w1, stride_c1, stride_d1, stride_d2, stride_d3);
     hadamard_tensor_4d_int(tensor_out1, sliced_tensor, tensor_b, n1, h1, w1, c1);
     perf.CollectDelta();
-    results += "tensor_slicing_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "tensor_slicing_" + tensor_info + "," + "cpu," + perf.PrintCounters() + "," + print_checksum_i32(sliced_tensor, n1*h1*w1*c1) + "\n";
 
     perf.ClearCounters();
     DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
@@ -677,7 +680,7 @@ std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data
     perf.CollectCounters();
     hadamard_tensor_4d_int(tensor_out2, Ar, tensor_b2, n1, h1, w1, c1);
     perf.CollectDelta();
-    results += "tensor_slicing_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "tensor_slicing_" + tensor_info + "," + "dtu," + perf.PrintCounters() + "," + print_checksum_i32(Ar, n1*h1*w1*c1) + "\n";
 
     delete[] tensor_in;
     delete[] sliced_tensor; 
@@ -719,7 +722,7 @@ std::string benchmark::bench_wrapper_highdim_stencil(const BenchmarkData &bench_
     perf.CollectCounters();
     highdim_7stencil_cpu(base_tensor, new_tensor, nx, ny, nz);
     perf.CollectDelta();
-    results += "highdim_7stencil_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "highdim_7stencil_" + tensor_info + "," + "cpu," + perf.PrintCounters() + "," + std::to_string(print_checksum(new_tensor, ny*nx*nz)) + "\n";
 
 
 
@@ -740,7 +743,7 @@ std::string benchmark::bench_wrapper_highdim_stencil(const BenchmarkData &bench_
     highdim_7stencil_dtu(Ar, new_tensor2, nx, ny, nz);
     perf.CollectDelta();
     //printf("done\n");
-    results += "highdim_7stencil_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "highdim_7stencil_" + tensor_info + "," + "dtu," + perf.PrintCounters() + "," + std::to_string(print_checksum(new_tensor2, ny*nx*nz)) + "\n";
     //printf("%s\n", results.c_str());
 
 
@@ -805,8 +808,8 @@ std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data
 
     std::string results;
     PerfManager perf;
-    std::string conf = CreateBenchmarkConfig(bench_data);
-    printf("conf:\n%s\n", conf.c_str());
+    std::string conf = CreateBenchmarkConfig2(nBenchData);
+    //printf("conf:\n%s\n", conf.c_str());
     
     std::string tensor_info = std::to_string(d4) + "x" + std::to_string(d3) + "x" + std::to_string(d2)  + "x" + std::to_string(d1);
     
@@ -833,7 +836,7 @@ std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data
         }
     }
     perf.CollectDelta();
-    results += "cubestencil_8corner_cpu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "cubestencil_8corner_" + tensor_info + "," + "cpu," + perf.PrintCounters() + "," + print_checksum_i32(filter_tensor1, d4*ncubes*CUBE_SIZE) + "\n";
 
 
 
@@ -867,7 +870,7 @@ std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data
 
     perf.CollectDelta();
     //printf("done\n");
-    results += "cubestencil_8corner_dtu_" + tensor_info + "," + perf.PrintCounters() + "\n";
+    results += "cubestencil_8corner_" + tensor_info + "," + "dtu," + "," + print_checksum_i32(Ar, d4*ncubes*CUBE_SIZE) + "\n";
 
     delete[] in_tensor;
     delete[] filter_tensor1;

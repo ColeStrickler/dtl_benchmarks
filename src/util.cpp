@@ -63,6 +63,34 @@ volatile void flush_cache() {
     free(array);
 }
 
+std::string print_checksum_ul(uint32_t *C, int length)
+{
+  uint64_t chsum = 0;
+  for (int i = 0; i < length; i++)
+    chsum += C[i];
+
+  return std::to_string(chsum);
+}
+
+std::string print_checksum_i32(int *C, int length)
+{
+  int chsum = 0;
+  for (int i = 0; i < length; i++)
+    chsum += C[i];
+
+  return std::to_string(chsum);
+}
+
+std::string print_checksum_ull(uint64_t *C, int length)
+{
+  uint64_t chsum = 0;
+  for (int i = 0; i < length; i++)
+    chsum += C[i];
+
+  return std::to_string(chsum);
+}
+
+
 int configure_relcache() {
 
   flush_cache();

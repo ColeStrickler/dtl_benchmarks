@@ -99,7 +99,7 @@ std::string PerfManager::PrintCounters()
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
     ret += std::to_string(m_Counters.m_LLCAccessCount) + ",";
-    ret += std::to_string(m_Counters.m_LLCMissCounter) + ",";
+    ret += std::to_string(m_Counters.m_LLCMissCounter) + "";
 #endif 
     return ret;
 }

@@ -583,12 +583,13 @@ int main(int argc, char* argv[]) {
     printf("DTL::API::HASERROR\n");
     return 0;
   }
-
+  PerfManager perf;
+  std::cout << "benchmark,type," << perf.PrintCountersLabel() << "hash" <<"\n";
   for (auto& bench : benchmark::BenchmarkDispatchData)
   {
-    printf("calling bench\n");
+   // printf("calling bench\n");
     std::cout << bench.benchmark(bench, api);
-    api->DebugPrintAllocator();
+    //api->DebugPrintAllocator();
   }
 
 
