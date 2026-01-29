@@ -47,69 +47,37 @@ void cube_stencil_8corner_cpu(int *tensor, int *out_tensor, int d4, int d3, int 
 }
 
 
-void algo()
-{
-//    int d1_max;
-//    int d2_max;
-//    int d3_max;
-//    int d4_max;
-//    int stride_d1;
-//    int stride_d2;
-//    int stride_d3;
-//    int stride_d4;
-//    int out_size;
-//    int item_size;
-//#define TYPE int
-//
-//
-//    TYPE out[out_size];
-//    TYPE data_item[item_size];
-//    int out_index = 0;
-//    for (int d4 = 0; d4 < d4_max; d4++)
-//        for (int d3 = 0; d3 < d3_max; d3++)
-//            for (int d2 = 0; d2 < d2_max; d2++)
-//                for (int d1 = 0; d1 < d1_max; d1++)
-//                    out[out_index++] = d1*stride_d1 + d2*stride_d2 + d3*stride_d3 + d4*stride_d4;
-//
-//
-//
-//    
-//    TYPE out[out_size];
-//    TYPE data_item[item_size];
-//    int out_index = 0;
-//
-//    /*
-//        int c1 =        <any number>
-//        int c2 =        <any number>
-//        int carray[] =  {parameterizable length array}
-//        ......
-//        int c_cmax =    <any number>
-//    */
-//
-//    for (int d4 = 0; d4 < d4_max; d4++)
-//        for (int d3 = 0; d3 < d3_max; d3++)
-//            for (int d2 = 0; d2 < d2_max; d2++)
-//                for (int d1 = 0; d1 < d1_max; d1++)
-//                    out[out_index++] = d1*stride_d1 + d2*stride_d2 + d3*stride_d3 + d4*stride_d4;
-//                    /* 
-//                        out[out_index++] = i*j*c1*c2*52944219;
-//                        out[out_index++] = d4_max + my_const_array[d1]*d2;
-//                        .....
-//                        out[out_index++] = <arbitrary combination>
-//                    */
-//
-
-    int out;
+// New State Registers
+/*
 
 
-    int row_size = 2560;
-    int col_size = 4;
-    
-    for (int col = 0; col < 640; col++)
-    {
-        for (int row = 0; row < 640; row++)
-        {
-            out = row*row_size + col*col_size;
-        }
-    }
-}
+Reg Dim1 = UInt(log2ceil(maxDimSize))
+Reg Dim2 = UInt(log2ceil(maxDimSize))
+Reg Dim3 = UInt(log2ceil(maxDimSize))
+Reg Dim4 = UInt(log2ceil(maxDimSize))
+Reg Dim5 = UInt(log2ceil(maxDimSize))
+Reg Dim6 = UInt(log2ceil(maxDimSize))
+
+Reg Dim1_stride = UInt(log2ceil(maxStride))
+Reg Dim2_stride = UInt(log2ceil(maxStride))
+Reg Dim3_stride = UInt(log2ceil(maxStride))
+Reg Dim4_stride = UInt(log2ceil(maxStride))
+Reg Dim5_stride = UInt(log2ceil(maxStride))
+Reg Dim6_stride = UInt(log2ceil(maxStride))
+
+Reg vAutoInc = Bool(1bit)
+Reg vDim1Index = Vec(vWidth, UInt(log2ceil(maxDimSize)))
+Reg vDim2Index = Vec(vWidth, UInt(log2ceil(maxDimSize)))
+Reg vDim3Index = Vec(vWidth, UInt(log2ceil(maxDimSize)))
+Reg vDim4Index = Vec(vWidth, UInt(log2ceil(maxDimSize)))
+Reg vDim5Index = Vec(vWidth, UInt(log2ceil(maxDimSize)))
+Reg vDim6Index = Vec(vWidth, UInt(log2ceil(maxDimSize)))
+
+
+
+vloadIDim (vreg %0) --> load using Dimensional Index registers
+vloadNoDim <addr> (vreg %0) --> load using index reversing
+vWriteVDimI (%x), vreg %0 --> write data to a specifc vDimIndex register
+vWriteDimStride (%x), <scalar>
+vWriteDim (%x), scalar
+*/

@@ -81,6 +81,15 @@ std::string print_checksum_i32(int *C, int length)
   return std::to_string(chsum);
 }
 
+std::string vec2String(const std::vector<uint32_t> &v)
+{
+  std::string ret;
+  for (auto& i: v)
+    ret += std::to_string(i) + "_";
+  
+  return ret;  
+}
+
 std::string print_checksum_ull(uint64_t *C, int length)
 {
   uint64_t chsum = 0;
