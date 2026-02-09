@@ -63,14 +63,54 @@ std::string bench_wrapper_multithread_SoA(const BenchmarkData& bench_data, DTL::
 
 
 
-
-
 std::string InsertDTLConfigParameters(const BenchmarkData& benchmark_data);
 std::string CreateConstants(const std::unordered_map<std::string, BenchParam>& constants);
 std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
 
 
+static std::vector<BenchmarkData> BenchmarkDispatchDataSplitLayouts = {
+    {
+        "filter_select_db",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {64}},
+            {"filter_col_offsets", {16, 20, 36, 52}},
+            {"selection_col_offsets", {8, 28, 36, 56}},         
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 43690},            
+            {"COLUMNS", 4},
+        },
+        {
+
+        },
+        bench_wrapper_db_filterselect,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+    //    {
+    //    "im2col",                       //  Benchmark
+    //    {                               // CONSTANTS
+    //        {"height", {1024}},         
+    //        {"width", {1024}},
+    //        {"data_size", {4}}
+    //    },
+    //    {                               // LOOP PARAMETERS
+    //        {"CHANNELS", 1},            
+    //        {"KW", 2},
+    //        {"KH", 2},
+    //        {"HMAX", 1919},
+    //        {"WMAX", 1079}
+    //    },
+    //    {                               // OTHER
+    //        {"CHANNELS_OUT", 1},        
+    //    },
+    //    bench_wrapper_im2col,           // bench function
+    //    "",                             // artifact in
+    //    ""                              // artifact out
+    //},
+};
 
 /*
     Maybe later we can set up a data element size. for now it is always assumed element_size=4bytes

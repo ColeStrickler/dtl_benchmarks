@@ -568,9 +568,9 @@ int main(int argc, char* argv[]) {
 
 
 
-
-  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 9, 1, 2);
-  hwStat->nMaxConfigs = 1;
+  
+  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 1, 1, 2);
+  hwStat->nMaxConfigs = 4;
   
 
 
@@ -585,7 +585,7 @@ int main(int argc, char* argv[]) {
   }
   PerfManager perf;
   std::cout << "benchmark,type," << perf.PrintCountersLabel() << "hash" <<"\n";
-  for (auto& bench : benchmark::BenchmarkDispatchData)
+  for (auto& bench : benchmark::BenchmarkDispatchDataSplitLayouts)
   {
    // printf("calling bench\n");
     std::cout << bench.benchmark(bench, api);

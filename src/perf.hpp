@@ -30,7 +30,7 @@
 
 
 //#define INCLUDE_INCLUSIVE_LLC_COUNTERS
-#define INCLUDE_BOOM_PERF_EXTRA
+//#define INCLUDE_BOOM_PERF_EXTRA
 #define INCLUDE_INCLUSIVE_LLC_COUNTERS
 /*
     Custom intra-core counters for the boom core
@@ -50,7 +50,7 @@
 #endif
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-#define LLC_PERF_BASE 0x2010000
+#define LLC_PERF_BASE 0x2110000
 #define LLC_ACCESS_COUNT 0x608      // SET TO ACTUAL
 #define LLC_MISS_COUNT 0x600
 #define READ_LLC_ACCESS_COUNT(base) (READ_UINT64(base + LLC_ACCESS_COUNT))

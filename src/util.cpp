@@ -31,14 +31,39 @@ int dump_buffer_to_disk(const std::string& outfile, unsigned char* outbuf, unsig
     return 0;
 }
 
-void randomize_region_deterministic(uint8_t *data, size_t size){
+void randomize_region_deterministic(uint8_t *data, size_t size) {
     if (!data || size == 0) return;
 
-    static std::mt19937 gen(12345); // fixed seed
-    static std::uniform_int_distribution<uint8_t> dist(0, 255);
+    uint8_t write = 0;
+    for (size_t i = 0; i < size; i++)
+    {
+      data[i] = write;
+      write += 1;
+    }
 
-    std::generate(data, data + size, [&]() { return dist(gen); });
+
+    //std::mt19937 gen(12345);
+    //std::uniform_int_distribution<unsigned int> dist(0, 255);
+//
+    //std::generate(data, data + size, [&]() {
+    //    return static_cast<uint8_t>(dist(gen));
+    //});
 }
+
+
+
+void randomize_region_deterministic_int(int *data, size_t size) {
+    if (!data || size == 0) return;
+
+    std::mt19937 gen(12345);
+    std::uniform_int_distribution<int> dist(0, 4096);
+    
+    std::generate(data, data + size, [&]() {
+        return static_cast<int>(dist(gen));
+    });
+}
+
+
 
 int open_fd() {
   int fd = open("/dev/mem", O_RDWR | O_SYNC);
@@ -76,8 +101,12 @@ std::string print_checksum_i32(int *C, int length)
 {
   int chsum = 0;
   for (int i = 0; i < length; i++)
+  {
     chsum += C[i];
-
+    //printf("CHECKSUM %d\n", C[i]);
+  }
+    
+  
   return std::to_string(chsum);
 }
 
@@ -125,7 +154,22 @@ int configure_relcache() {
 }
 
 
+bool writeStringToFile(const std::string &filename, const std::string &data, bool append) {
+    // open file in write or append mode
+    std::ofstream out(filename, append ? std::ios::app : std::ios::trunc);
+    if (!out.is_open()) {
+        std::cerr << "Error: cannot open file " << filename << "\n";
+        return false;
+    }
 
+    out << data;
+    if (!out) {
+        std::cerr << "Error: write failed\n";
+        return false;
+    }
+
+    return true;
+}
 
 
 int reset_relcache() {  

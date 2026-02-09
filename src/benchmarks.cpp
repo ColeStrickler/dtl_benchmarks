@@ -12,12 +12,13 @@ std::string benchmark::InsertDTLConfigParameters(const BenchmarkData& benchmark_
     auto& params = benchmark_data.params;
 
     for (auto& [key, value] : params) {
+        printf("%s,%d\n", key.c_str(), value);
         std::string token = "[" + key + "]";
         size_t pos;
         while ((pos = dtl_parameterized_config.find(token)) != std::string::npos)
             dtl_parameterized_config.replace(pos, token.size(), std::to_string(value));
     }
-
+    //printf("parametrized config %s\n", dtl_parameterized_config.c_str());
     return dtl_parameterized_config;
 }
 
@@ -26,6 +27,7 @@ std::string benchmark::CreateConstants(const std::unordered_map<std::string, Ben
 
     for (auto& e: constants)
     {
+        printf("const %s\n", vec2String(e.second));
         std::string constDecl = "int " + e.first + " = ";
         assert(e.second.size() >= 1);
         if (e.second.size() > 1) // an array
@@ -80,7 +82,7 @@ std::string benchmark::bench_wrapper_db_filterselect(const BenchmarkData & bench
     uint32_t rows = bench_data.params.at("ROWS");
     uint32_t cols =  bench_data.params.at("COLUMNS"); // this is currently just the # of selection columns
     uint32_t row_size = bench_data.constants.at("row_size")[0];
-    uint32_t col_sum_width_combined = sizeof(uint32_t)*(bench_data.constants.at("selection_col_offsets").size() + bench_data.constants.at("filter_col_offsets").size());
+    uint32_t col_sum_width_combined = sizeof(uint32_t)*(bench_data.constants.at("selection_col_offsets").size() + bench_data.constants.at("filter_col_offsets").size() - 1);
     uint32_t col_filter_width_split = sizeof(uint32_t)*bench_data.constants.at("filter_col_offsets").size();
     uint32_t col_sel_width_split = sizeof(uint32_t)*bench_data.constants.at("selection_col_offsets").size();
     uint32_t col_width = 4;
@@ -91,46 +93,87 @@ std::string benchmark::bench_wrapper_db_filterselect(const BenchmarkData & bench
 
     // combine filter and selection columns
     std::vector<uint32_t> combined;
-    combined.insert(combined.end(), oneTableData.constants.at("filter_col_offsets").begin(), oneTableData.constants.at("filter_col_offsets").end());
-    combined.insert(combined.end(), oneTableData.constants.at("selection_col_offsets").begin(), oneTableData.constants.at("selection_col_offsets").end());
+    combined.insert(combined.end(), bench_data.constants.at("filter_col_offsets").begin(), bench_data.constants.at("filter_col_offsets").end());
+
+    combined.insert(combined.end(), bench_data.constants.at("selection_col_offsets").begin(), bench_data.constants.at("selection_col_offsets").end());
+    auto rit = std::find(combined.rbegin(), combined.rend(), 36); // no need for duplicate column
+    if (rit != combined.rend())
+    {
+        combined.erase(std::next(rit).base());
+    }
+
     //std::sort(combined.begin(), combined.end()); // not needed if we want them grouped contiguously
+
+
 
     oneTableData.name = "db_col_project";
     oneTableData.params = bench_data.params;
-    oneTableData.params["COLUMNS"] = bench_data.constants.at("filter_col_offsets").size() + bench_data.constants.at("selection_col_offsets").size();
+    oneTableData.params["COLUMNS"] = combined.size();
     oneTableData.constants.insert({"row_size", bench_data.constants.at("row_size")});
     oneTableData.constants.insert({"col_offsets", combined});
 
     splitTableData_filter = bench_data;
+    splitTableData_filter.name = "db_col_project";
     splitTableData_filter.constants.erase("selection_col_offsets");
+    splitTableData_filter.constants.insert({"col_offsets", splitTableData_filter.constants.at("filter_col_offsets")});
+    splitTableData_filter.constants.erase("filter_col_offsets");
 
     splitTableData_sel = bench_data;
+    splitTableData_sel.name = "db_col_project";
     splitTableData_sel.constants.erase("filter_col_offsets");
-
+    splitTableData_sel.constants.insert({"col_offsets", splitTableData_sel.constants.at("selection_col_offsets")});
+    splitTableData_sel.constants.erase("selection_col_offsets");
 
     oneEphemeralTableConf = CreateBenchmarkConfig(oneTableData);
     splitEphemeralTableConf_filter = CreateBenchmarkConfig(splitTableData_filter);
     splitEphemeralTableConf_sel = CreateBenchmarkConfig(splitTableData_sel);
 
-    DTL::EphemeralRegion* ephemeral_oneTable = api->AllocEphemeralRegion(rows*cols*sizeof(int));
+    DTL::EphemeralRegion* ephemeral_splitFilter = api->AllocEphemeralRegion(rows*row_size);
+    if (!api->Compile(splitEphemeralTableConf_filter)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral_splitFilter);
+    
+
+
+    DTL::EphemeralRegion* ephemeral_splitSelect = api->CloneEphemeralRegion(ephemeral_splitFilter);
+    if (!api->Compile(splitEphemeralTableConf_sel)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral_splitSelect);
+
+    DTL::EphemeralRegion* ephemeral_oneTable = api->AllocEphemeralRegion(rows*row_size);
+    printf("ephemeral alloced\n");
     if (!api->Compile(oneEphemeralTableConf)) {
         printf("Failed to compile dtl program or map onto agu\n");
         return "Failed to compile dtl program or map onto agu\n";
     }
     api->ProgramHardware(ephemeral_oneTable);
 
-    int* Aw = (int*)ephemeral_oneTable->GetHeadlessWriteregion();
 
+    printf("Cloning region\n");
+
+    int* split_FilterReadRegion = (int*)ephemeral_splitFilter->GetHeadlessReadRegion();
+    int* split_FilterWriteRegion = (int*)ephemeral_splitFilter->GetHeadlessWriteregion();
+    int* split_SelectReadRegion = (int*)ephemeral_splitSelect->GetHeadlessReadRegion();
+    int* split_SelectWriteRegion = (int*)ephemeral_splitSelect->GetHeadlessWriteregion();
+    
+    printf("programmed\n");
+    int* Aw = (int*)ephemeral_oneTable->GetHeadlessWriteregion();
     int* db1 = (int*)ephemeral_oneTable->GetHeadlessReadRegion();
     int* write_out1 = new int[rows*cols]; // maximum number written out
     int* write_out2 = new int[rows*cols]; // maximum number written out
-    randomize_region_deterministic((uint8_t*)Aw, row_size*rows*sizeof(int));
-    
+    printf("writing region\n");
+    randomize_region_deterministic_int(Aw, 16*rows);
+    randomize_region_deterministic_int(split_FilterWriteRegion, 16*rows);
+    printf("done writing region\n");
 
-    std::string bench_info_combined = "db_filterselect_combined_" + vec2String(oneTableData.constants.at("filter_col_offsets"))\
-        + "_" + vec2String(oneTableData.constants.at("selection_col_offsets"));
-    std::string bench_info_split = "db_filterselect_split_" + vec2String(oneTableData.constants.at("filter_col_offsets"))\
-        + "_" + vec2String(oneTableData.constants.at("selection_col_offsets"));
+    std::string bench_info_combined = "db_filterselect_combined_" + vec2String(bench_data.constants.at("filter_col_offsets"))\
+        + "_" + vec2String(bench_data.constants.at("selection_col_offsets"));
+    std::string bench_info_split = "db_filterselect_split_" + vec2String(bench_data.constants.at("filter_col_offsets"))\
+        + "_" + vec2String(bench_data.constants.at("selection_col_offsets"));
     
 
 
@@ -141,78 +184,93 @@ std::string benchmark::bench_wrapper_db_filterselect(const BenchmarkData & bench
         <filter1, filter2, ... filterN>, <sel1, sel2, ... selN>
         <+1 col_width, +2 col_width, ...> .... 
     */
-
+    printf("running bench\n");
     perf.CollectCounters();
     int x = 0;
     for (int i = 0; i < rows; i++)
     {
-        int c5 =    READ_INT32(reinterpret_cast<uint64_t>(db1) + i*col_sum_width_combined);
-        int c6 =    READ_INT32(reinterpret_cast<uint64_t>(db1) + i*col_sum_width_combined + col_width);
-        int c10 =   READ_INT32(reinterpret_cast<uint64_t>(db1) + i*col_sum_width_combined + 2*col_width);
-        int c14 =   READ_INT32(reinterpret_cast<uint64_t>(db1) + i*col_sum_width_combined + 3*col_width);
+        
+        int c5 =    READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*col_sum_width_combined);
+        int c6 =    READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*col_sum_width_combined + col_width);
+        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*col_sum_width_combined + 2*col_width);
+        int c14 =   READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*col_sum_width_combined + 3*col_width);
+
+        // TEMPORARY
+
+        //int Xc5 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split);
+        //int Xc6 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + col_width);
+        //int Xc10 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 2*col_width);
+        //int Xc14 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 3*col_width);
+        //if (Xc5 != c5 || Xc6 != c6 || Xc10 != c10 || Xc14 != c14)
+        //{
+        //    printf("%d\n", i);
+        //}
+        //assert(Xc5 == c5);
+        //assert(Xc6 == c6);
+        //assert(Xc10 == c10);
+        //assert(Xc14 == c14);
+
+        
         if (c5 < 256 && c6 > 64 && c10%2 == 0 && c14 > 128)
         {
-            for (int j = 0; j < cols; j++)
-                write_out1[x++] = READ_INT32(reinterpret_cast<uint64_t>(db1) + i*col_sum_width_combined + (j+4)*col_width);
+            write_out1[x++] = c10;
+            for (int j = 0; j < cols-1; j++)
+            {
+                write_out1[x++] = READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*col_sum_width_combined + (j+4)*col_width);
+            }
         }   
     }
     perf.CollectDelta();
-    results += bench_info_combined + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out1, rows*cols) + "\n";
-    api->FreeEphemeralRegion(ephemeral_oneTable);
-
-
-
-    DTL::EphemeralRegion* ephemeral_splitFilter = api->AllocEphemeralRegion(rows*cols*sizeof(int));
-    if (!api->Compile(splitEphemeralTableConf_filter)) {
-        printf("Failed to compile dtl program or map onto agu\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_splitFilter);
+    printf("finished bench\n");
+    results += bench_info_combined + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out1, x) + "\n";
     
 
-    DTL::EphemeralRegion* ephemeral_splitSelect = api->CloneEphemeralRegion(ephemeral_splitFilter);
-    if (!api->Compile(splitEphemeralTableConf_sel)) {
-        printf("Failed to compile dtl program or map onto agu\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_splitSelect);
 
 
-    int* split_FilterReadRegion = (int*)ephemeral_splitFilter->GetHeadlessReadRegion();
-    int* split_FilterWriteRegion = (int*)ephemeral_splitFilter->GetHeadlessWriteregion();
-    int* split_SelectReadRegion = (int*)ephemeral_splitSelect->GetHeadlessReadRegion();
-    int* split_SelectWriteRegion = (int*)ephemeral_splitFilter->GetHeadlessWriteregion();
-
-    /*
-        We should be able to use either write region, and it should propagate
-    */
-    randomize_region_deterministic(reinterpret_cast<uint8_t*>(split_FilterWriteRegion), row_size*rows*sizeof(int));
 
 
     perf.ClearCounters();
-    perf.GetCounters();
+    /*
+        We should be able to use either write region, and it should propagate
+    */
+
+
+    //for (int i = 0; i < rows*16; i++)
+    //{
+    //    assert(split_FilterWriteRegion[i] == Aw[i]);
+    //}
+
+    
+    perf.CollectCounters();
     int x2 = 0;
     for (int i = 0; i < rows; i++)
     {
-        int c5 =    READ_INT32(reinterpret_cast<uint64_t>(split_FilterReadRegion) + i*col_filter_width_split);
-        int c6 =    READ_INT32(reinterpret_cast<uint64_t>(split_FilterReadRegion) + i*col_filter_width_split + col_width);
-        int c10 =   READ_INT32(reinterpret_cast<uint64_t>(split_FilterReadRegion) + i*col_filter_width_split + 2*col_width);
-        int c14 =   READ_INT32(reinterpret_cast<uint64_t>(split_FilterReadRegion) + i*col_filter_width_split + 3*col_width);
+        int c5 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split);
+        int c6 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + col_width);
+        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 2*col_width);
+        int c14 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 3*col_width);
+
         if (c5 < 256 && c6 > 64 && c10%2 == 0 && c14 > 128)
         {
             for (int j = 0; j < cols; j++)
-                write_out2[x2++] = READ_INT32(reinterpret_cast<uint64_t>(split_SelectReadRegion) + j*col_sel_width_split + j*col_width);
+            {
+                if (j == 2)
+                    write_out2[x2++] = c10;
+                else
+                    write_out2[x2++] = READ_INT32(reinterpret_cast<uint8_t*>(split_SelectReadRegion) + i*col_sel_width_split + j*col_width);
+            }
         }
     }
     perf.CollectDelta();
-    results += bench_info_split + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out2, rows*cols) + "\n";
-
-
+    results += bench_info_split + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out2, x2) + "\n";
+    printf("x=%d, x2=%d\n", x, x2);
+    assert(x2 == x);
     api->FreeEphemeralRegion(ephemeral_splitFilter);
     api->FreeEphemeralRegion(ephemeral_splitSelect);
-
+    api->FreeEphemeralRegion(ephemeral_oneTable);
     delete[] write_out1;
     delete[] write_out2;
+    return results;
 }
 
 std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
