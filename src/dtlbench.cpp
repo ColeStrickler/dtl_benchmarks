@@ -568,8 +568,8 @@ int main(int argc, char* argv[]) {
 
 
 
-  
-  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 1, 1, 2);
+  //auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 8, 1, 2);
+  auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 8, 1, 2);
   hwStat->nMaxConfigs = 4;
   
 

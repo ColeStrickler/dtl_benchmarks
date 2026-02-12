@@ -125,15 +125,18 @@ std::string benchmark::bench_wrapper_db_filterselect(const BenchmarkData & bench
     splitTableData_sel.constants.erase("selection_col_offsets");
 
     oneEphemeralTableConf = CreateBenchmarkConfig(oneTableData);
+    std::cout << oneEphemeralTableConf << "\n\n\n";
     splitEphemeralTableConf_filter = CreateBenchmarkConfig(splitTableData_filter);
+    std::cout << splitEphemeralTableConf_filter << "\n\n\n";
     splitEphemeralTableConf_sel = CreateBenchmarkConfig(splitTableData_sel);
-
+    std::cout << splitEphemeralTableConf_sel << "\n\n\n";
     DTL::EphemeralRegion* ephemeral_splitFilter = api->AllocEphemeralRegion(rows*row_size);
     if (!api->Compile(splitEphemeralTableConf_filter)) {
         printf("Failed to compile dtl program or map onto agu\n");
         return "Failed to compile dtl program or map onto agu\n";
     }
     api->ProgramHardware(ephemeral_splitFilter);
+    
     
 
 
@@ -271,6 +274,260 @@ std::string benchmark::bench_wrapper_db_filterselect(const BenchmarkData & bench
     delete[] write_out1;
     delete[] write_out2;
     return results;
+}
+
+std::string benchmark::bench_wrapper_db_filterselect5(const BenchmarkData &bench_data, DTL::API *api) 
+{
+#define C0 0
+#define C1 4
+#define C2 8
+#define C3 12
+#define C4 16
+#define C5 20
+#define C6 24
+#define C7 28
+#define C8 32
+#define C9 36
+#define C10 40
+#define C11 44
+#define C12 48
+#define C13 52
+#define C14 56
+#define C15 60
+
+    std::string results;
+    PerfManager perf;
+
+
+
+    std::string oneEphemeralTableConf; // c3,c8,c10,c15 | c5,c6,C10,c15
+    std::string splitEphemeralTableConf_sel; // c5,c6,C10,c15
+    std::string splitEphemeralTableConf_filter1; // c3
+    std::string splitEphemeralTableConf_filter2; // c8
+    std::string splitEphemeralTableConf_filter3; // c10
+    std::string splitEphemeralTableConf_filter4; // c15
+    assert(bench_data.constants.find("row_size") != bench_data.constants.end());
+    assert(bench_data.params.find("ROWS") != bench_data.params.end());
+    assert(bench_data.params.find("COLUMNS") != bench_data.params.end());
+    assert(bench_data.constants.find("filter_col_offsets") != bench_data.constants.end());
+    assert(bench_data.constants.find("selection_col_offsets") != bench_data.constants.end());
+
+    
+    BenchmarkData bench_data_copy =  bench_data;
+    bench_data_copy.constants.erase("filter_col_offsets");
+    bench_data_copy.constants.erase("selection_col_offsets");
+    std::vector<uint32_t> oneTableCols = {C3, C8, C10, C15, C5, C6, C10, C14};
+    std::vector<uint32_t> split_selCols = {C5, C6, C10, C14};
+    std::vector<uint32_t> split_filterCols1 = {C3};
+    std::vector<uint32_t> split_filterCols2 = {C8};
+    std::vector<uint32_t> split_filterCols3 = {C10};
+    std::vector<uint32_t> split_filterCols4 = {C15};
+
+
+
+    std::string bench_info_combined = "db_filterselect_combined_" + vec2String(oneTableCols)\
+        + "__" + vec2String(split_selCols);
+    std::string bench_info_split = "db_filterselect_split5table_" + vec2String(oneTableCols)\
+        + "__" + vec2String(split_selCols);
+    
+
+
+
+
+
+
+    BenchmarkData oneTableData              = bench_data_copy;
+    BenchmarkData splitTableData_sel        = bench_data_copy;
+    BenchmarkData splitTableData_filter1    = bench_data_copy;
+    BenchmarkData splitTableData_filter2    = bench_data_copy;
+    BenchmarkData splitTableData_filter3    = bench_data_copy;
+    BenchmarkData splitTableData_filter4    = bench_data_copy;
+
+    oneTableData.constants.insert({"col_offsets", oneTableCols});
+    splitTableData_sel.constants.insert({"col_offsets", split_selCols});
+    splitTableData_filter1.constants.insert({"col_offsets", split_filterCols1});
+    splitTableData_filter2.constants.insert({"col_offsets", split_filterCols2});
+    splitTableData_filter3.constants.insert({"col_offsets", split_filterCols3});
+    splitTableData_filter4.constants.insert({"col_offsets", split_filterCols4});
+    oneTableData.params.insert({"COLUMNS", oneTableData.constants.at("col_offsets").size()});
+    splitTableData_sel.params.insert({"COLUMNS", splitTableData_sel.constants.at("col_offsets").size()});
+    splitTableData_filter1.params.insert({"COLUMNS", splitTableData_filter1.constants.at("col_offsets").size()});
+    splitTableData_filter2.params.insert({"COLUMNS", splitTableData_filter2.constants.at("col_offsets").size()});
+    splitTableData_filter3.params.insert({"COLUMNS", splitTableData_filter3.constants.at("col_offsets").size()});
+    splitTableData_filter4.params.insert({"COLUMNS", splitTableData_filter4.constants.at("col_offsets").size()});
+    uint32_t rows = bench_data_copy.params.at("ROWS");
+    uint32_t row_size = bench_data_copy.constants.at("row_size")[0];
+    std::string oneTableConf;
+    std::string splitSelConf;
+    std::string splitFilterConf1;
+    std::string splitFilterConf2;
+    std::string splitFilterConf3;
+    std::string splitFilterConf4;
+
+    oneTableConf = CreateBenchmarkConfig(oneTableData);
+    splitSelConf = CreateBenchmarkConfig(splitTableData_sel);
+    splitFilterConf1 = CreateBenchmarkConfig(splitTableData_filter1);
+    splitFilterConf2 = CreateBenchmarkConfig(splitTableData_filter2);
+    splitFilterConf3 = CreateBenchmarkConfig(splitTableData_filter3);
+    splitFilterConf4 = CreateBenchmarkConfig(splitTableData_filter4);
+
+    DTL::EphemeralRegion* oneTableRegion = api->AllocEphemeralRegion(rows*64);
+    DTL::EphemeralRegion* split_SelRegion = api->CloneEphemeralRegion(oneTableRegion);
+    DTL::EphemeralRegion* split_FilterRegion1 = api->CloneEphemeralRegion(oneTableRegion);
+    DTL::EphemeralRegion* split_FilterRegion2 = api->CloneEphemeralRegion(oneTableRegion);
+    DTL::EphemeralRegion* split_FilterRegion3 = api->CloneEphemeralRegion(oneTableRegion);
+    DTL::EphemeralRegion* split_FilterRegion4 = api->CloneEphemeralRegion(oneTableRegion);
+
+
+    if (!api->Compile(oneTableConf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(oneTableRegion);
+    
+        if (!api->Compile(splitSelConf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(split_SelRegion);
+    
+
+        if (!api->Compile(splitFilterConf1)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(split_FilterRegion1);
+    
+        if (!api->Compile(splitFilterConf2)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(split_FilterRegion2);
+    
+        if (!api->Compile(splitFilterConf3)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(split_FilterRegion3);
+    
+    if (!api->Compile(splitFilterConf4)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(split_FilterRegion4);
+    
+    
+    
+
+    int* oneTableRead   = (int*)oneTableRegion->GetHeadlessReadRegion();
+    int* oneTableWrite  = (int*)oneTableRegion->GetHeadlessReadRegion();
+    int* split_SelRead = (int*)split_SelRegion->GetHeadlessReadRegion();
+    int* split_FilterRead1 = (int*)split_FilterRegion1->GetHeadlessReadRegion();
+    int* split_FilterRead2 = (int*)split_FilterRegion2->GetHeadlessReadRegion();
+    int* split_FilterRead3 = (int*)split_FilterRegion3->GetHeadlessReadRegion();
+    int* split_FilterRead4 = (int*)split_FilterRegion4->GetHeadlessReadRegion();
+
+    // We just need to intiate data at the base region, since they all point to the same table
+    randomize_region_deterministic_int(oneTableWrite, 16*rows);
+
+
+    int* write_out1 = new int[split_selCols.size()*rows];
+    int* write_out2 = new int[split_selCols.size()*rows];
+
+
+    uint32_t col_sum_width_combined1 = oneTableCols.size()*sizeof(int);
+    int x = 0;
+    int cols = oneTableCols.size();
+    int col_width = 4;
+    perf.CollectCounters();
+    for (int i = 0; i < rows; i++)
+    {
+        
+        int c3 =    READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1);
+        int c8 =    READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + col_width);
+        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + 2*col_width);
+        int c15 =   READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + 3*col_width);
+
+
+        if (c3 < 256 && c8 > 64 && c10%2 == 0 && c15 > 128)
+        {          
+            for (int j = 0; j < cols; j++)
+            {
+                if (j == 2)
+                    write_out1[x++] = c10;
+                else
+                    write_out1[x++] = READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + (j+4)*col_width);
+            }
+             
+        }   
+    }
+    perf.CollectDelta();
+    results += bench_info_combined + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out1, x) + "\n";
+
+
+
+
+    
+    perf.ClearCounters();
+    uint32_t col_sum_width_combined2 = split_selCols.size()*sizeof(int);
+    int x2 = 0;
+    int cols2 = oneTableCols.size();
+
+
+    perf.CollectCounters();
+    for (int i = 0; i < rows; i++)
+    {
+        
+        int c3 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRegion1) + i*col_width);
+        int c8 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRegion2) + i*col_width);
+        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRegion3) + i*col_width);
+        int c15 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRegion4) + i*col_width);
+
+
+        if (c3 < 256 && c8 > 64 && c10%2 == 0 && c15 > 128)
+        {          
+            for (int j = 0; j < cols; j++)
+            {
+                if (j == 2)
+                    write_out2[x2++] = c10;
+                else
+                    write_out2[x2++] = READ_INT32(reinterpret_cast<uint8_t*>(split_SelRegion) + i*col_sum_width_combined2 + j*col_width);
+            }
+             
+        }   
+    }
+    perf.CollectDelta();
+    results += bench_info_split + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out1, x) + "\n";
+
+
+
+    delete[] write_out1;
+    delete[] write_out2;
+    api->FreeEphemeralRegion(oneTableRegion);
+    api->FreeEphemeralRegion(split_SelRegion);
+    api->FreeEphemeralRegion(split_FilterRegion1);
+    api->FreeEphemeralRegion(split_FilterRegion2);
+    api->FreeEphemeralRegion(split_FilterRegion3);
+    api->FreeEphemeralRegion(split_FilterRegion4);
+
+
+    return results;
+#undef C0
+#undef C1
+#undef C2
+#undef C3
+#undef C4
+#undef C5
+#undef C6
+#undef C7
+#undef C8
+#undef C9
+#undef C10
+#undef C11
+#undef C12
+#undef C13
+#undef C14
+#undef C15
 }
 
 std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,

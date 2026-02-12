@@ -46,6 +46,7 @@ struct BenchmarkData
 
 
 std::string bench_wrapper_db_filterselect(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_db_filterselect5(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_im2col(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_db_colproject(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_matmul_transpose(const BenchmarkData& bench_data, DTL::API* api);
@@ -73,9 +74,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataSplitLayouts = {
     {
         "filter_select_db",             //  Benchmark
         {                               // CONSTANTS
-            {"row_size", {64}},
-            {"filter_col_offsets", {16, 20, 36, 52}},
-            {"selection_col_offsets", {8, 28, 36, 56}},         
+            {"row_size", {16}},
+            {"filter_col_offsets", {5, 6, 10, 14}},
+            {"selection_col_offsets", {3, 8, 10, 15}},         
         },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
@@ -120,9 +121,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
     {
         "filter_select_db",             //  Benchmark
         {                               // CONSTANTS
-            {"row_size", {64}},
-            {"filter_col_offsets", {16, 20, 36, 52}},
-            {"selection_col_offsets", {8, 28, 36, 56}},         
+            {"row_size", {16}},
+            {"filter_col_offsets", {5, 6, 10, 14}},
+            {"selection_col_offsets", {3, 8, 10, 15}},         
         },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
