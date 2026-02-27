@@ -63,7 +63,7 @@ std::string print_checksum_ull(uint64_t *C, int length);
 std::string print_checksum_ul(uint32_t *C, int length);
 std::string print_checksum_i32(int *C, int length);
 std::string vec2String(const std::vector<uint32_t>& v);
-
+void randomize_region_deterministic_float(float *data, size_t size);
 void randomize_region_deterministic_int(int *data, size_t size);
 bool writeStringToFile(const std::string &filename, const std::string &data, bool append);
 

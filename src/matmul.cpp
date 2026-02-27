@@ -74,14 +74,7 @@ void zero_matrix(float* matrix, int dimension)
     }
 }
 
-double print_checksum_l(float *C, int length)
-{
-  double chsum = 0.0f;
-  for (int i = 0; i < length; i++)
-    chsum += C[i];
 
-  return chsum;
-}
 
 void zero_matrix_int(int *matrix, int dimension) {
   for (int i = 0; i < dimension; i++) {
@@ -161,6 +154,31 @@ double print_checksum(float *C, int dimention)
     }
     return sum;
 }
+
+
+
+double print_checksum_float(float *C, int n)
+{
+    double sum = 0.0;
+    for(int i = 0; i < n; i++) {
+          if (!std::isfinite(C[i])) { // skip NaN/inf
+            printf("Invalid element at index %d: %f\n", i, C[i]);
+            continue;
+        }
+            sum += C[i];
+    }
+    return sum;
+}
+
+double print_checksum_l(float *C, int length)
+{
+  double chsum = 0.0f;
+  for (int i = 0; i < length; i++)
+    chsum += C[i];
+
+  return chsum;
+}
+
 
 
 double print_checksum_int(int* C, int dimention)
@@ -292,9 +310,10 @@ void transpose_naive(float *src, float *dst, int src_row, int src_col)
 void transpose_naive_int(int *src, int *dst, int src_row, int src_col)
 // src: m(src_row) x n(src_col)  -> dst: n x m
 {
+    int x = 0;
     for (int i = 0; i < src_col; i++) {
         for (int j = 0; j < src_row; j++) {
-            dst[i*src_row+j] = src[j*src_col+i];
+            dst[x++] = src[j*src_col+i];
         }
     }
 }

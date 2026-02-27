@@ -1,5 +1,5 @@
 #include "tensor_permutation.hpp"
-
+#include "stdio.h"
 void nhwc_to_nchw_cpu(float *data_im, int batch_size, int channels, int height, int width, float *data_out) {
 
     int i = 0;

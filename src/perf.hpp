@@ -32,6 +32,7 @@
 //#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 //#define INCLUDE_BOOM_PERF_EXTRA
 #define INCLUDE_INCLUSIVE_LLC_COUNTERS
+//#define INCLUDE_BOOM_PERF_EXTRA
 /*
     Custom intra-core counters for the boom core
 */

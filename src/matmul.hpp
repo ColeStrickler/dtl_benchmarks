@@ -34,7 +34,7 @@ do { \
 
 
 double print_checksum_l(float* C, int length);
-
+double print_checksum_float(float *C, int n);
 void zero_matrix_int(int* matrix, int dimension);
 void copy_matrix_int(int* src, int* dst, int dimension);
 void init_data_int(int *A, int *B, int *C, int dimension);

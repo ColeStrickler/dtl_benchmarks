@@ -52,6 +52,20 @@ void randomize_region_deterministic(uint8_t *data, size_t size) {
 
 
 
+void randomize_region_deterministic_float(float *data, size_t size) {
+    if (!data || size == 0) return;
+
+    std::mt19937 gen(12345);
+    std::uniform_real_distribution<float> dist(0.0f, 10.0f);
+    
+    std::generate(data, data + size, [&]() {
+        return dist(gen);
+    });
+}
+
+
+
+
 void randomize_region_deterministic_int(int *data, size_t size) {
     if (!data || size == 0) return;
 
@@ -103,7 +117,6 @@ std::string print_checksum_i32(int *C, int length)
   for (int i = 0; i < length; i++)
   {
     chsum += C[i];
-    //printf("CHECKSUM %d\n", C[i]);
   }
     
   

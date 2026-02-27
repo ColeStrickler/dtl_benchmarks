@@ -22,6 +22,7 @@
 #include "slicing.hpp"
 #include "highdim_stencil.hpp"
 #include "cube_stencil.hpp"
+#include "bijective.hpp"
 
 namespace benchmark
 {
@@ -35,6 +36,7 @@ struct BenchmarkData
 {
     std::string name;
     std::unordered_map<std::string, BenchParam> constants;
+    std::unordered_map<std::string, BenchParam> constArray;
     std::unordered_map<std::string, uint32_t> params;
     std::unordered_map<std::string, uint32_t> other;
     BenchFn benchmark;            // Now this is valid
@@ -47,6 +49,10 @@ struct BenchmarkData
 
 std::string bench_wrapper_db_filterselect(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_db_filterselect5(const BenchmarkData& bench_data, DTL::API* api);
+
+
+std::string bench_wrapper_imageAugmentation(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_imageAugmentation_fuse(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_im2col(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_db_colproject(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_matmul_transpose(const BenchmarkData& bench_data, DTL::API* api);
@@ -66,17 +72,46 @@ std::string bench_wrapper_multithread_SoA(const BenchmarkData& bench_data, DTL::
 
 std::string InsertDTLConfigParameters(const BenchmarkData& benchmark_data);
 std::string CreateConstants(const std::unordered_map<std::string, BenchParam>& constants);
+std::string CreateConstantArray(const std::unordered_map<std::string, BenchParam> &constantArray);
 std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
 
 
 static std::vector<BenchmarkData> BenchmarkDispatchDataSplitLayouts = {
+
     {
-        "filter_select_db",             //  Benchmark
+        "db_col_project",             //  Benchmark
         {                               // CONSTANTS
             {"row_size", {16}},
             {"filter_col_offsets", {5, 6, 10, 14}},
             {"selection_col_offsets", {3, 8, 10, 15}},         
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"ROWS", 43690},            
+            {"COLUMNS", 4},
+        },
+        {
+
+        },
+        bench_wrapper_db_filterselect5,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+    {
+        "db_col_project",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {16}},
+            {"filter_col_offsets", {5, 6, 10, 14}},
+            {"selection_col_offsets", {3, 8, 10, 15}},         
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
@@ -113,6 +148,216 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataSplitLayouts = {
     //},
 };
 
+
+static std::vector<BenchmarkData> TMEComparisonData = {
+    {
+        "img_augmentation",             //  Benchmark
+        {                               // CONSTANTS
+            {"H", {512}},         
+            {"W", {512}},            // will assume square image for this one
+            {"stride_n", {3*512*512}},
+            {"stride_h", {3*512}},
+            {"stride_w", {3}}
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"NMAX", 8},
+            {"CMAX", 3},
+            {"WMAX", 512},
+            {"HMAX", 512}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_imageAugmentation, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+     {
+        "img_augmentation",             //  Benchmark
+        {                               // CONSTANTS
+            {"H", {512}},         
+            {"W", {512}},            // will assume square image for this one
+            {"stride_n", {3*512*512}},
+            {"stride_h", {3*512}},
+            {"stride_w", {3}}
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"NMAX", 8},
+            {"CMAX", 3},
+            {"WMAX", 512},
+            {"HMAX", 512}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_imageAugmentation_fuse, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+    {
+        "nhwc_permutation",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {512}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 8},
+            {"CHANNELS", 3},
+            {"SIZE_SQUARED", 512*512}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_nhwc_permutation, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    
+    
+    {
+        "im2col",                       //  Benchmark
+        {                               // CONSTANTS
+            {"height", {1024}},         
+            {"width", {1024}},
+            {"data_size", {4}}
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"CHANNELS", 1},            
+            {"KW", 2},
+            {"KH", 2},
+            {"HMAX", 1023},
+            {"WMAX", 1023}
+        },
+        {                               // OTHER
+            {"CHANNELS_OUT", 1},        
+        },
+        bench_wrapper_im2col,           // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "tensor_unfold",                //  Benchmark
+        {                               // CONSTANTS
+            {"stride_d1", {8}},
+            {"stride_d2", {8*64}},
+            {"stride_d3", {8*64*64}},
+            {"data_size", {4}}
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"D1", 8},            
+            {"D2", 64},
+            {"D3", 64},
+            {"D4", 128}
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_tensorunfold,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "batch2space",             //  Benchmark
+        {                               // CONSTANTS
+            {"channels", {3}},         
+            {"size", {64}},            // will assume square image for this one
+            {"data_size", {4}}
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"BATCH_SIZE", 8},
+            {"CHANNELS", 3},
+            {"HEIGHT", 64},
+            {"WIDTH", 64}            
+        },
+        {                               // OTHER
+            {"use_real_image", 0},
+            {"ksize", 2}
+        },
+        bench_wrapper_batch2space, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "tensor_slicing",                   //  Benchmark
+        {                                   // CONSTANTS
+            {"stride_n1", {2}},
+            {"stride_h1", {4}},
+            {"stride_w1", {2}},
+            {"stride_c1", {64}},
+            {"stride_d1", {512}},
+            {"stride_d2", {512*64}},
+            {"stride_d3", {512*64*64}},
+            {"data_size", {4}}
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"D1", 512},            
+            {"D2", 64},
+            {"D3", 64},
+            {"D4", 8}
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_tensorslice,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "matmul_transpose",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {640}},         
+            {"col_size", {1}},
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"NROWS", 640},
+            {"NCOLS", 640}            
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_matmul_transpose, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+};
+
+
+
+
 /*
     Maybe later we can set up a data element size. for now it is always assumed element_size=4bytes
 */
@@ -124,6 +369,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"row_size", {16}},
             {"filter_col_offsets", {5, 6, 10, 14}},
             {"selection_col_offsets", {3, 8, 10, 15}},         
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
@@ -140,6 +388,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
         "cube_stencil_8corner",         //  Benchmark
         {                               // CONSTANTS
             {"data_size", {4}}
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"N_3DSTRUCT", 64}, // 4th dimension
@@ -167,6 +418,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"stride_d3", {8*64*64}},
             {"data_size", {4}}
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"D1", 8},            
             {"D2", 64},
@@ -193,6 +447,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"stride_d3", {512*64*64}},
             {"data_size", {4}}
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"D1", 512},            
             {"D2", 64},
@@ -212,6 +469,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"height", {1920}},         
             {"width", {1080}},
             {"data_size", {4}}
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"CHANNELS", 3},            
@@ -234,6 +494,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"row_size", {64}},         
             {"col_offsets", {4, 8, 16, 24, 28, 32, 40, 48, 52, 56, 60}},
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
             {"COLUMNS", 11},
@@ -251,6 +514,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
         {                               // CONSTANTS
             {"row_size", {64}},         
             {"col_offsets", {4, 32, 48}},
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
@@ -270,6 +536,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"row_size", {512}},         
             {"col_offsets", {104, 256, 444}},
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
             {"COLUMNS", 3},
@@ -286,6 +555,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
         {                               // CONSTANTS
             {"row_size", {512}},         
             {"col_offsets", {4, 64, 120, 164, 256, 312, 368, 400, 444, 488, 500}},
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"ROWS", 43690},            
@@ -305,6 +577,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"row_size", {2560}},         
             {"col_size", {4}},
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"NROWS", 640},
             {"NCOLS", 640}                 
@@ -323,6 +598,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"channels", {3}},         
             {"size", {128}},            // will assume square image for this one
             {"data_size", {4}}
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"BATCH_SIZE", 16},
@@ -344,6 +622,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"size", {64}},            // will assume square image for this one
             {"data_size", {4}}
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"BATCH_SIZE", 16},
             {"CHANNELS", 3},
@@ -364,6 +645,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"size", {256}},            // will assume square image for this one
             {"data_size", {4}}
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"BATCH_SIZE", 16},
             {"CHANNELS", 3},
@@ -384,6 +668,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"size", {256}},            // will assume square image for this one
             {"data_size", {4}}
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"BATCH_SIZE", 8},
             {"CHANNELS", 3},
@@ -403,6 +690,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"channels", {3}},         
             {"size", {512}},            // will assume square image for this one
             {"data_size", {4}}
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"BATCH_SIZE", 8},
@@ -425,6 +715,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"size", {64}},            // will assume square image for this one
             {"data_size", {4}}
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"BATCH_SIZE", 16},
             {"CHANNELS", 3},
@@ -445,6 +738,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"channels", {3}},         
             {"size", {64}},            // will assume square image for this one
             {"data_size", {4}}
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"BATCH_SIZE", 128},
@@ -467,6 +763,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchData = {
             {"stride_nx", {256*128}},
             {"stride_ny", {128}},
             {"data_size", {4}}
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"NX_MINUS_1", 127},            
@@ -497,6 +796,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataLong = {
             {"row_size", {8192}},         
             {"col_size", {4}},
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"NROWS", 2048},
             {"NCOLS", 2048}            
@@ -515,6 +817,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataLong = {
             {"row_size", {64}},         
             {"col_offsets", {4, 8, 16, 24, 28, 32, 40, 48, 52, 56, 60}},
         },
+        {
+
+        },
         {                               // LOOP PARAMETERS
             {"ROWS", 442368},            
             {"COLUMNS", 11},
@@ -532,6 +837,9 @@ static std::vector<BenchmarkData> BenchmarkDispatchDataLong = {
         {                               // CONSTANTS
             {"row_size", {64}},         
             {"col_offsets", {4, 32, 48}},
+        },
+        {
+
         },
         {                               // LOOP PARAMETERS
             {"ROWS", 442368},            

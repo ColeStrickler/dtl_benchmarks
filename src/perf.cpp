@@ -131,6 +131,7 @@ void PerfManager::CollectCounters() {
     m_Counters.m_LLCAccessCount = READ_LLC_ACCESS_COUNT(m_ControlRegionBase);
     m_Counters.m_LLCMissCounter =  READ_LLC_MISS_COUNT(m_ControlRegionBase);
 #endif
+   // printf("got counters\n");
 }
 
 void PerfManager::CollectDelta()
