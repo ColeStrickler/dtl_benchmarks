@@ -33,6 +33,48 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                     )"
     },
 
+    {"db_join", \
+                R"(
+
+                for (int x = 0; x < [NTABLE_COUNT]; x++)
+                {
+                    for (int i = 0; i < [NROWS]; i++)
+                    {
+                        for (int j = 0; j < [NCOLS]; j++)
+                        {
+                                switch(x)
+                                {
+                                    case:
+                                        out = table1_base + t1_c1 + i*t1row_size;
+                                        out = table2_base + t2_c1 + i*t2row_size;
+                                    case:
+                                        out = table1_base + t1_c2 + i*t2row_size;
+                                        out = table2_base + t2_c2 + i*t2row_size;
+                                    case:
+                                        out = table1_base + t1_c3 + i*t2row_size;
+                                        out = table2_base + t2_c3 + i*t2row_size;
+                                }
+                            }
+                            
+                        }
+                    }
+                    )"
+    },
+
+
+    {"aos_to_soa", \
+                    R"(
+                    for (int i = 0; i < [NSTRUCT]; i++)
+                    {
+                        for (int j = 0; j < [NOFFSETS]; j++)
+                        {
+                            out = i*struct_size + var_offsets[j];
+                        }
+                    }
+                    )"
+    },
+
+
 
     {"matmul_transpose", \
                         R"(
@@ -70,7 +112,7 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                     {
                                         for (int w = 0; w < [WIDTH]; w++)
                                         {
-                                            out = (c*(size*size) + h*(size) + n*(channels*size*size) + w);
+                                            out = (c + h*(size*channels) + n*(channels*size*size) + w*channels);
                                         }
                                     }
                                 }
@@ -78,7 +120,7 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                         )"
     },
 
-    {"tensor_unfold", \
+    {"tensor_unfold1", \
                         R"(
                             for (int k = 0; k < [D2]; k++)
                             {
@@ -96,6 +138,61 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                         )"
     },
 
+    {"tensor_unfold2", \
+                        R"(
+                            for (int l = 0; l < [D1]; l++)
+                            {
+                                for (int i = 0; i < [D3]; i++)
+                                {
+                                    for (int j = 0; j < [D4]; j++)
+                                    {
+                                        for (int k = 0; k < [D2]; k++)
+                                        {
+                                            out = l + k*(stride_d1) + j*(stride_d3) + i*(stride_d2);
+                                        }
+                                    }
+                                }
+                            }
+                        )"
+    },
+
+    {"tensor_unfold3", \
+                        R"(
+                            for (int l = 0; l < [D1]; l++)
+                            {
+                                for (int k = 0; k < [D2]; k++)
+                                {
+                                    for (int j = 0; j < [D4]; j++)
+                                    {
+                                        for (int i = 0; i < [D3]; i++)
+                                        {
+                                            out = l + k*(stride_d1) + j*(stride_d3) + i*(stride_d2);
+                                        }
+                                    }
+                                }
+                            }
+                        )"
+    },
+
+    {"tensor_unfold4", \
+                        R"(
+                            for (int l = 0; l < [D1]; l++)
+                            {
+                                for (int k = 0; k < [D2]; k++)
+                                {
+                                    for (int i = 0; i < [D3]; i++)
+                                    {
+                                        for (int j = 0; j < [D4]; j++)
+                                        {
+                                            out = l + k*(stride_d1) + j*(stride_d3) + i*(stride_d2);
+                                        }
+                                    }
+                                }
+                            }
+                        )"
+    },
+
+
     
     {"tensor_slicing", \
                         R"(
@@ -107,7 +204,7 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                     {
                                         for (int l = 0; l < [D1]; l++)
                                         {
-                                            out = l*(stride_c1) + j*(stride_d1*stride_w1) + k*(stride_h1*stride_d2) + i*(stride_n1*stride_d3);
+                                            out = (l*(stride_c1) + j*(stride_d1*stride_w1)) + (k*(stride_h1*stride_d2) + i*(stride_n1*stride_d3));
                                         }
                                     }
                                 }

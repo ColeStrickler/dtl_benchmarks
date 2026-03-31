@@ -8,7 +8,7 @@ void batch_to_space(float *data_im,
                     float *data_out)
 {
     int i = 0;
-    // assume chw format
+    // assume hwc format in
     for (int c = 0; c < channels; c++)
     {
         for (int h = 0; h < height; h++)
@@ -17,7 +17,7 @@ void batch_to_space(float *data_im,
             {
                 for (int w = 0; w < width; w++)
                 {
-                    data_out[i++] = data_im[w + n*(height*width*channels) + h*width + c*(height*width)]; 
+                    data_out[i++] = data_im[w*channels + n*(height*width*channels) + h*width*channels + c]; 
                 }
             }
         }

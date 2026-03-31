@@ -87,765 +87,444 @@ std::string benchmark::CreateBenchmarkConfig2(BenchmarkData benchmark_data)
 
     return constants +"\n" +constArr + "\n"+ config_body;
 }
-#define C0 0
-#define C1 1
-#define C2 2
-#define C3 3
-#define C4 4
-#define C5 5
-#define C6 6
-#define C7 7
-#define C8 8
-#define C9 9
-#define C10 10
-#define C11 11
-#define C12 12
-#define C13 13
-#define C14 14
-#define C15 15
-std::string benchmark::bench_wrapper_db_filterselect(const BenchmarkData & bench_data, DTL::API *api) 
-{
-    std::string results;
-    PerfManager perf;
 
-    std::string oneEphemeralTableConf;
-    std::string splitEphemeralTableConf_sel;
-    std::string splitEphemeralTableConf_filter;
-    assert(bench_data.constants.find("row_size") != bench_data.constants.end());
-    assert(bench_data.constants.find("filter_col_offsets") != bench_data.constants.end());
-    assert(bench_data.constants.find("selection_col_offsets") != bench_data.constants.end());
-    assert(bench_data.params.find("ROWS") != bench_data.params.end());
-    assert(bench_data.params.find("COLUMNS") != bench_data.params.end());
+std::string benchmark::bench_wrapper_zipStruct(const BenchmarkData &bench_data, DTL::API *api) {
+  
 
-    uint32_t rows = bench_data.params.at("ROWS");
-    uint32_t cols =  bench_data.params.at("COLUMNS"); // this is currently just the # of selection columns
-    uint32_t row_size = bench_data.constants.at("row_size")[0];
-    uint32_t col_sum_width_combined = sizeof(uint32_t)*(bench_data.constants.at("selection_col_offsets").size() + bench_data.constants.at("filter_col_offsets").size() - 1);
-    uint32_t col_filter_width_split = sizeof(uint32_t)*bench_data.constants.at("filter_col_offsets").size();
-    uint32_t col_sel_width_split = sizeof(uint32_t)*bench_data.constants.at("selection_col_offsets").size();
-    uint32_t col_width = 4;
 
-    std::vector<uint32_t> oneTableCols = {C5, C6, C10, C14, C3, C8, C10, C15};
-    std::vector<uint32_t> split_selCols = {C3, C8, C10, C15};
-    std::vector<uint32_t> split_FilterCols = {C5, C6, C10, C14};
-
-    BenchmarkData oneTableData;
-    BenchmarkData splitTableData_sel;
-    BenchmarkData splitTableData_filter;
-
-    // combine filter and selection columns
-    std::vector<uint32_t> combined;
-    combined.insert(combined.end(), bench_data.constants.at("filter_col_offsets").begin(), bench_data.constants.at("filter_col_offsets").end());
-
-    combined.insert(combined.end(), bench_data.constants.at("selection_col_offsets").begin(), bench_data.constants.at("selection_col_offsets").end());
-    auto rit = std::find(combined.rbegin(), combined.rend(), 36); // no need for duplicate column
-    if (rit != combined.rend())
-    {
-        combined.erase(std::next(rit).base());
-    }
-
-    //std::sort(combined.begin(), combined.end()); // not needed if we want them grouped contiguously
-
-
-
-    oneTableData.name = "db_col_project";
-    oneTableData.params = bench_data.params;
-    oneTableData.params["COLUMNS"] = combined.size();
-    oneTableData.constants.insert({"row_size", bench_data.constants.at("row_size")});
-    oneTableData.constants.insert({"col_offsets", oneTableCols});
-
-    splitTableData_filter = bench_data;
-    splitTableData_filter.name = "db_col_project";
-    splitTableData_filter.constants.erase("selection_col_offsets");
-    splitTableData_filter.constants.insert({"col_offsets", split_FilterCols});
-    splitTableData_filter.constants.erase("filter_col_offsets");
-
-    splitTableData_sel = bench_data;
-    splitTableData_sel.name = "db_col_project";
-    splitTableData_sel.constants.erase("filter_col_offsets");
-    splitTableData_sel.constants.insert({"col_offsets", split_selCols});
-    splitTableData_sel.constants.erase("selection_col_offsets");
-
-    oneEphemeralTableConf = CreateBenchmarkConfig(oneTableData);
-    std::cout << oneEphemeralTableConf << "\n\n\n";
-    splitEphemeralTableConf_filter = CreateBenchmarkConfig(splitTableData_filter);
-    std::cout << splitEphemeralTableConf_filter << "\n\n\n";
-    splitEphemeralTableConf_sel = CreateBenchmarkConfig(splitTableData_sel);
-    std::cout << splitEphemeralTableConf_sel << "\n\n\n";
-
-
-    DTL::EphemeralRegion* ephemeral_oneTable = api->AllocEphemeralRegion(rows*64);
-    printf("ephemeral alloced\n");
-    if (!api->Compile(oneEphemeralTableConf)) {
-        printf("Failed to compile dtl program or map onto agu\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_oneTable);
-
-    DTL::EphemeralRegion* ephemeral_splitFilter = api->CloneEphemeralRegion(ephemeral_oneTable);
-    if (!api->Compile(splitEphemeralTableConf_filter)) {
-        printf("Failed to compile dtl program or map onto agu\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_splitFilter);
-    
-    DTL::EphemeralRegion* ephemeral_splitSelect = api->CloneEphemeralRegion(ephemeral_oneTable);
-    if (!api->Compile(splitEphemeralTableConf_sel)) {
-        printf("Failed to compile dtl program or map onto agu\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_splitSelect);
-
-
-    printf("Cloning region\n");
-
-    int* split_FilterReadRegion = (int*)ephemeral_splitFilter->GetHeadlessReadRegion();
-    int* split_FilterWriteRegion = (int*)ephemeral_splitFilter->GetHeadlessWriteregion();
-    int* split_SelectReadRegion = (int*)ephemeral_splitSelect->GetHeadlessReadRegion();
-    int* split_SelectWriteRegion = (int*)ephemeral_splitSelect->GetHeadlessWriteregion();
-    
-    printf("programmed\n");
-    int* Aw = (int*)ephemeral_oneTable->GetHeadlessWriteregion();
-    int* db1 = (int*)ephemeral_oneTable->GetHeadlessReadRegion();
-    int* write_out1 = new int[rows*16]; // maximum number written out
-    int* write_out2 = new int[rows*16]; // maximum number written out
-    printf("writing region\n");
-    randomize_region_deterministic_int(Aw, 16*rows);
-   // randomize_region_deterministic_int(split_FilterWriteRegion, 16*rows);
-    printf("done writing region\n");
-
-    std::string bench_info_combined = "db_filterselect_combined_" + vec2String(bench_data.constants.at("filter_col_offsets"))\
-        + "_" + vec2String(bench_data.constants.at("selection_col_offsets"));
-    std::string bench_info_split = "db_filterselect_split_" + vec2String(bench_data.constants.at("filter_col_offsets"))\
-        + "_" + vec2String(bench_data.constants.at("selection_col_offsets"));
-    
-
-
-    /*
-        Inside benchmarks.hpp, we assume the column offsets are sorted.
-        
-        When we combine them, we leave them apart. Thus we have
-        <filter1, filter2, ... filterN>, <sel1, sel2, ... selN>
-        <+1 col_width, +2 col_width, ...> .... 
-    */
-    printf("running bench\n");
-    perf.CollectCounters();
-    int x = 0;
-    for (int i = 0; i < rows; i++)
-    {
-        
-        int c5 =    READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*(8*sizeof(uint32_t)));
-        int c6 =    READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*(8*sizeof(uint32_t)) + col_width);
-        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*(8*sizeof(uint32_t)) + 2*col_width);
-        int c14 =   READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*(8*sizeof(uint32_t)) + 3*col_width);
-
-        // TEMPORARY
-
-        //int Xc5 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split);
-        //int Xc6 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + col_width);
-        //int Xc10 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 2*col_width);
-        //int Xc14 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 3*col_width);
-        //if (Xc5 != c5 || Xc6 != c6 || Xc10 != c10 || Xc14 != c14)
-        //{
-        //    printf("%d\n", i);
-        //}
-        //assert(Xc5 == c5);
-        //assert(Xc6 == c6);
-        //assert(Xc10 == c10);
-        //assert(Xc14 == c14);
-
-        
-        if (c5 < 256 && c6 > 64 && c10%2 == 0 && c14 > 128)
-        {
-            write_out1[x++] = c10;
-            for (int j = 0; j < cols-1; j++)
-            {
-                write_out1[x++] = READ_INT32(reinterpret_cast<uint8_t*>(db1) + i*8*sizeof(uint32_t)+ (j+4)*col_width);
-            }
-        }   
-    }
-    perf.CollectDelta();
-    printf("finished bench\n");
-    results += bench_info_combined + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out1, x) + "\n";
-    
-
-
-
-
-
-    perf.ClearCounters();
-    /*
-        We should be able to use either write region, and it should propagate
-    */
-
-
-    //for (int i = 0; i < rows*16; i++)
-    //{
-    //    assert(split_FilterWriteRegion[i] == Aw[i]);
-    //}
-
-    
-    perf.CollectCounters();
-    int x2 = 0;
-    for (int i = 0; i < rows; i++)
-    {
-        int c5 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split);
-        int c6 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + col_width);
-        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 2*col_width);
-        int c14 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterReadRegion) + i*col_filter_width_split + 3*col_width);
-
-        if (c5 < 256 && c6 > 64 && c10%2 == 0 && c14 > 128)
-        {
-            for (int j = 0; j < cols; j++)
-            {
-                if (j == 2)
-                    write_out2[x2++] = c10;
-                else
-                    write_out2[x2++] = READ_INT32(reinterpret_cast<uint8_t*>(split_SelectReadRegion) + i*col_sel_width_split + j*col_width);
-            }
-        }
-    }
-    perf.CollectDelta();
-    results += bench_info_split + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out2, x2) + "\n";
-    printf("\n\n\nx=%d, x2=%d\n\n\n", x, x2);
-
-    api->FreeEphemeralRegion(ephemeral_splitFilter);
-    api->FreeEphemeralRegion(ephemeral_splitSelect);
-    api->FreeEphemeralRegion(ephemeral_oneTable);
-    delete[] write_out1;
-    delete[] write_out2;
-    return results;
-}
-
-std::string benchmark::bench_wrapper_db_filterselect5(const BenchmarkData &bench_data, DTL::API *api) 
-{
-
-
-    std::string results;
-    PerfManager perf;
-
-
-
-    std::string oneEphemeralTableConf; // c3,c8,c10,c15 | c5,c6,C10,c15
-    std::string splitEphemeralTableConf_sel; // c5,c6,C10,c15
-    std::string splitEphemeralTableConf_filter1; // c3
-    std::string splitEphemeralTableConf_filter2; // c8
-    std::string splitEphemeralTableConf_filter3; // c10
-    std::string splitEphemeralTableConf_filter4; // c15
-    assert(bench_data.constants.find("row_size") != bench_data.constants.end());
-    assert(bench_data.params.find("ROWS") != bench_data.params.end());
-    assert(bench_data.params.find("COLUMNS") != bench_data.params.end());
-    assert(bench_data.constants.find("filter_col_offsets") != bench_data.constants.end());
-    assert(bench_data.constants.find("selection_col_offsets") != bench_data.constants.end());
-
-    
-    BenchmarkData bench_data_copy =  bench_data;
-    bench_data_copy.constants.erase("filter_col_offsets");
-    bench_data_copy.constants.erase("selection_col_offsets");
-    std::vector<uint32_t> oneTableCols = {C5, C6, C10, C14, C3, C8, C10, C15};
-    std::vector<uint32_t> split_selCols = {C3, C8, C10, C15};
-    std::vector<uint32_t> split_filterCols1 = {C5};
-    std::vector<uint32_t> split_filterCols2 = {C6};
-    std::vector<uint32_t> split_filterCols3 = {C10};
-    std::vector<uint32_t> split_filterCols4 = {C14};
-    
-
-
-    std::string bench_info_combined = "db_filterselect_combined_" + vec2String(oneTableCols)\
-        + "__" + vec2String(split_selCols);
-    std::string bench_info_split = "db_filterselect_split5table_" + vec2String(oneTableCols)\
-        + "__" + vec2String(split_selCols);
-    
-
-
-
-
-
-
-    BenchmarkData oneTableData              = bench_data_copy;
-    BenchmarkData splitTableData_sel        = bench_data_copy;
-    BenchmarkData splitTableData_filter1    = bench_data_copy;
-    BenchmarkData splitTableData_filter2    = bench_data_copy;
-    BenchmarkData splitTableData_filter3    = bench_data_copy;
-    BenchmarkData splitTableData_filter4    = bench_data_copy;
-
-    oneTableData.constants.insert({"col_offsets", oneTableCols});
-    splitTableData_sel.constants.insert({"col_offsets", split_selCols});
-    splitTableData_filter1.constArray.insert({"col_offsets", split_filterCols1});
-    splitTableData_filter2.constArray.insert({"col_offsets", split_filterCols2});
-    splitTableData_filter3.constArray.insert({"col_offsets", split_filterCols3});
-    splitTableData_filter4.constArray.insert({"col_offsets", split_filterCols4});
-    oneTableData.params.insert({"COLUMNS", oneTableData.constants.at("col_offsets").size()});
-    splitTableData_sel.params.insert({"COLUMNS", splitTableData_sel.constants.at("col_offsets").size()});
-    splitTableData_filter1.params.insert({"COLUMNS", splitTableData_filter1.constArray.at("col_offsets").size()});
-    splitTableData_filter2.params.insert({"COLUMNS", splitTableData_filter2.constArray.at("col_offsets").size()});
-    splitTableData_filter3.params.insert({"COLUMNS", splitTableData_filter3.constArray.at("col_offsets").size()});
-    splitTableData_filter4.params.insert({"COLUMNS", splitTableData_filter4.constArray.at("col_offsets").size()});
-    uint32_t rows = bench_data_copy.params.at("ROWS");
-    uint32_t row_size = bench_data_copy.constants.at("row_size")[0];
-    std::string oneTableConf;
-    std::string splitSelConf;
-    std::string splitFilterConf1;
-    std::string splitFilterConf2;
-    std::string splitFilterConf3;
-    std::string splitFilterConf4;
-
-    oneTableConf = CreateBenchmarkConfig(oneTableData);
-    splitSelConf = CreateBenchmarkConfig(splitTableData_sel);
-    splitFilterConf1 = CreateBenchmarkConfig2(splitTableData_filter1);
-    splitFilterConf2 = CreateBenchmarkConfig2(splitTableData_filter2);
-    splitFilterConf3 = CreateBenchmarkConfig2(splitTableData_filter3);
-    splitFilterConf4 = CreateBenchmarkConfig2(splitTableData_filter4);
-
-    std::cout <<     oneTableConf << "\n\n\n";
-    std::cout <<     splitSelConf << "\n\n\n";
-    std::cout << splitFilterConf1 << "\n\n\n";
-    std::cout << splitFilterConf2 << "\n\n\n";
-    std::cout << splitFilterConf3 << "\n\n\n";
-    std::cout << splitFilterConf4 << "\n\n\n";
-
-
-
-    DTL::EphemeralRegion* oneTableRegion = api->AllocEphemeralRegion(rows*64);
-    DTL::EphemeralRegion* split_SelRegion = api->CloneEphemeralRegion(oneTableRegion);
-    DTL::EphemeralRegion* split_FilterRegion1 = api->CloneEphemeralRegion(oneTableRegion);
-    DTL::EphemeralRegion* split_FilterRegion2 = api->CloneEphemeralRegion(oneTableRegion);
-    DTL::EphemeralRegion* split_FilterRegion3 = api->CloneEphemeralRegion(oneTableRegion);
-    DTL::EphemeralRegion* split_FilterRegion4 = api->CloneEphemeralRegion(oneTableRegion);
-
-    printf("HERE DONE ALLOCATING REGIONS\n");
-    if (!api->Compile(oneTableConf)) {
-        printf("Failed to compile dtl program or map onto agu1\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(oneTableRegion);
-     printf("HERE 1\n");
-    
-        if (!api->Compile(splitSelConf)) {
-        printf("Failed to compile dtl program or map onto agu2\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(split_SelRegion);
-    printf("HERE 2\n");
-
-        if (!api->Compile(splitFilterConf1)) {
-        printf("Failed to compile dtl program or map onto agu3\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(split_FilterRegion1);
-    printf("HERE 3\n");
-        if (!api->Compile(splitFilterConf2)) {
-        printf("Failed to compile dtl program or map onto agu4\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(split_FilterRegion2);
-    printf("HERE 4\n");
-        if (!api->Compile(splitFilterConf3)) {
-        printf("Failed to compile dtl program or map onto agu5\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(split_FilterRegion3);
-    printf("HERE 5\n");
-    if (!api->Compile(splitFilterConf4)) {
-        printf("Failed to compile dtl program or map onto agu6\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(split_FilterRegion4);
-    printf("HERE 6\n");
-    
-     printf("HERE DONE PROGRAMMING REGIONS\n");
-
-    int* oneTableRead   = (int*)oneTableRegion->GetHeadlessReadRegion();
-    int* oneTableWrite  = (int*)oneTableRegion->GetHeadlessWriteregion();
-    int* split_SelRead = (int*)split_SelRegion->GetHeadlessReadRegion();
-    int* split_FilterRead1 = (int*)split_FilterRegion1->GetHeadlessReadRegion();
-    int* split_FilterRead2 = (int*)split_FilterRegion2->GetHeadlessReadRegion();
-    int* split_FilterRead3 = (int*)split_FilterRegion3->GetHeadlessReadRegion();
-    int* split_FilterRead4 = (int*)split_FilterRegion4->GetHeadlessReadRegion();
-
-    // We just need to intiate data at the base region, since they all point to the same table
-    randomize_region_deterministic_int(oneTableWrite, 16*rows);
-
-
-    int* write_out1 = new int[split_selCols.size()*rows];
-    int* write_out2 = new int[split_selCols.size()*rows];
-
-
-    uint32_t col_sum_width_combined1 = oneTableCols.size()*sizeof(int);
-    int x = 0;
-    int cols = oneTableCols.size();
-    int col_width = 4;
-    perf.CollectCounters();
-    for (int i = 0; i < rows; i++)
-    {
-        
-        int c3 =    READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1);
-        int c8 =    READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + col_width);
-        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + 2*col_width);
-        int c15 =   READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + 3*col_width);
-
-
-        if (c3 < 256 && c8 > 64 && c10%2 == 0 && c15 > 128)
-        {          
-            for (int j = 0; j < cols; j++)
-            {
-                if (j == 2)
-                    write_out1[x++] = c10;
-                else
-                    write_out1[x++] = READ_INT32(reinterpret_cast<uint8_t*>(oneTableRead) + i*col_sum_width_combined1 + (j+4)*col_width);
-            }
-             
-        }   
-    }
-    perf.CollectDelta();
-    results += bench_info_combined + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out1, x) + "\n";
-    std::cout << results << "\n";
-
-
-
-    
-    perf.ClearCounters();
-    uint32_t col_sum_width_combined2 = split_selCols.size()*sizeof(int);
-    int x2 = 0;
-    int cols2 = oneTableCols.size();
-
-    printf("start second\n");
-    perf.CollectCounters();
-    for (int i = 0; i < rows; i++)
-    {
-        
-        int c3 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRead1) + i*col_width);
-        if (c3 >= 256)
-            continue;
-        int c8 =    READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRead2) + i*col_width);
-        if (c8 <= 64)
-            continue;
-        int c10 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRead3) + i*col_width);
-        if (c10 % 2 != 0)
-            continue;
-        int c15 =   READ_INT32(reinterpret_cast<uint8_t*>(split_FilterRead4) + i*col_width);
-        if (c15 <= 128)
-            continue;
-
-        
-        for (int j = 0; j < cols; j++)
-        {
-            if (j == 2)
-                write_out2[x2++] = c10;
-            else
-                write_out2[x2++] = READ_INT32(reinterpret_cast<uint8_t*>(split_SelRead) + i*col_sum_width_combined2 + j*col_width);
-        }
-             
-          
-    }
-    perf.CollectDelta();
-    results += bench_info_split + ",dtu," + perf.PrintCounters() + "," + print_checksum_i32(write_out1, x) + "\n";
-    std::cout << results << "\n";
-            printf("\n\n\nx=%d, x2=%d\n\n\n", x, x2);
-
-    delete[] write_out1;
-    delete[] write_out2;
-    api->FreeEphemeralRegion(oneTableRegion);
-    api->FreeEphemeralRegion(split_SelRegion);
-    api->FreeEphemeralRegion(split_FilterRegion1);
-    api->FreeEphemeralRegion(split_FilterRegion2);
-    api->FreeEphemeralRegion(split_FilterRegion3);
-    api->FreeEphemeralRegion(split_FilterRegion4);
-
-
-    return results;
 
 }
 
-#undef C0
-#undef C1
-#undef C2
-#undef C3
-#undef C4
-#undef C5
-#undef C6
-#undef C7
-#undef C8
-#undef C9
-#undef C10
-#undef C11
-#undef C12
-#undef C13
-#undef C14
-#undef C15
-
-std::string benchmark::bench_wrapper_imageAugmentation(const BenchmarkData &bench_data, DTL::API *api) 
-{
-    std::string results = "";
-    PerfManager perf;
-
-
-    assert(bench_data.params.find("NMAX") != bench_data.params.end());
-    assert(bench_data.params.find("CMAX") != bench_data.params.end());
-    assert(bench_data.params.find("HMAX") != bench_data.params.end());
-    assert(bench_data.params.find("WMAX") != bench_data.params.end());
-
-    assert(bench_data.constants.find("H") != bench_data.constants.end());
-    assert(bench_data.constants.find("W") != bench_data.constants.end());
-    assert(bench_data.constants.find("stride_n") != bench_data.constants.end());
-    assert(bench_data.constants.find("stride_h") != bench_data.constants.end());
-    assert(bench_data.constants.find("stride_w") != bench_data.constants.end());
-
-    assert(bench_data.other.find("ksize") != bench_data.other.end());
-    assert(bench_data.other.find("use_real_image") != bench_data.other.end());
-
-
-
-    auto n = static_cast<int>(bench_data.params.at("NMAX"));
-    auto c = static_cast<int>(bench_data.params.at("CMAX"));
-    auto h = static_cast<int>(bench_data.params.at("HMAX"));
-    auto w = static_cast<int>(bench_data.params.at("WMAX"));
-    std::string img_info =  std::to_string(n) + "_" + std::to_string(c) + "_" + std::to_string(h) + "_" + std::to_string(w);
-    /*
-        We instantiate the seven augmentations,
-    */
-
-    printf("Got params\n");
-    BenchmarkData permute_reflectX_data = bench_data;
-    BenchmarkData permute_reflectY_data = bench_data;
-    BenchmarkData permute_reflectX_reflectY_data = bench_data;
-    BenchmarkData permute_rotateLeft_data = bench_data;
-    BenchmarkData permute_rotateLeft_reflectX_data = bench_data;
-    BenchmarkData permute_rotateRight_data = bench_data;
-    BenchmarkData permute_rotateRight_reflextX_data = bench_data;
-    permute_reflectX_data.name  = "permute_reflect";
-    permute_reflectY_data.name  = "permute_flipy";
-    permute_reflectX_reflectY_data.name  = "permute_flipy_reflect";
-    permute_rotateLeft_data.name  = "permute_rot_left";
-    permute_rotateLeft_reflectX_data.name  = "permute_rot_left_reflect";
-    permute_rotateRight_data.name  = "permute_rot_right";
-    permute_rotateRight_reflextX_data.name  = "permute_rot_right_reflect";
-
-    std::string permute_reflectX_Conf = CreateBenchmarkConfig(permute_reflectX_data);
-    std::string permute_reflectY_Conf = CreateBenchmarkConfig(permute_reflectY_data);
-    std::string permute_reflectX_reflectY_Conf = CreateBenchmarkConfig(permute_reflectX_reflectY_data);
-    std::string permute_rotateLeft_Conf = CreateBenchmarkConfig(permute_rotateLeft_data);
-    std::string permute_rotateLeft_reflectX_Conf = CreateBenchmarkConfig(permute_rotateLeft_reflectX_data);
-    std::string permute_rotateRight_Conf = CreateBenchmarkConfig(permute_rotateRight_data);
-    std::string permute_rotateRight_reflectX_Conf = CreateBenchmarkConfig(permute_rotateRight_reflextX_data);
-     printf("Created config\n");
-
-
-    // Now we assume all of these are compiled ahead of time, and we either can use 7 configs, or swap them mid run
-    float* base_img = new float[n*c*h*w];
-    float* out_perm_reflectX = new float[n*c*h*w];
-    float* out_perm_reflectY = new float[n*c*h*w];
-    float* out_perm_reflectX_reflectY = new float[n*c*h*w];
-    float* out_perm_rotLeft = new float[n*c*h*w];
-    float* out_perm_rotLeft_reflectX = new float[n*c*h*w];
-    float* out_perm_rotRight = new float[n*c*h*w];
-    float* out_perm_rotRight_reflectX = new float[n*c*h*w];  
-    float* out2_perm_reflectX = new float[n*c*h*w];
-    float* out2_perm_reflectY = new float[n*c*h*w];
-    float* out2_perm_reflectX_reflectY = new float[n*c*h*w];
-    float* out2_perm_rotLeft = new float[n*c*h*w];
-    float* out2_perm_rotLeft_reflectX = new float[n*c*h*w];
-    float* out2_perm_rotRight = new float[n*c*h*w];
-    float* out2_perm_rotRight_reflectX = new float[n*c*h*w];  
 
 
 
 
-    randomize_region_deterministic_float(base_img, n*c*h*w);
-    printf("allocated regions\n");
+std::string benchmark::bench_wrapper_ecs(const BenchmarkData &bench_data,
+                                         DTL::API *api) {
+  std::string results = "";
+  PerfManager perf;
 
+  assert(bench_data.constants.find("struct_size") !=
+         bench_data.constants.end());
+  assert(bench_data.constArray.find("var_offsets") !=
+         bench_data.constArray.end());
+  assert(bench_data.params.find("NSTRUCT") != bench_data.params.end());
+  assert(bench_data.params.find("NOFFSETS") != bench_data.params.end());
 
+  auto struct_size = bench_data.constants.at("struct_size")[0];
+  auto var_offsets = bench_data.constArray.at("var_offsets");
+  auto nstructs = bench_data.params.at("NSTRUCT");
+  auto noffsets = bench_data.params.at("NOFFSETS");
+  std::string soa_config = CreateBenchmarkConfig2(bench_data);
 
-    perf.CollectCounters();
-    Shape shape_in({n,h,w,c});
-    Shape shape_augment({n,c,h,w});
-    permute_reflect_x2D(base_img, out_perm_reflectX, shape_in);
-    IntensityScaleBatch(0.1f, out_perm_reflectX,out2_perm_reflectX, shape_augment);
+  std::cout << soa_config << "\n\n\n" << std::endl;
 
-    permute_reflect_y2D(base_img, out_perm_reflectY, shape_in);
-    IntensityScaleBatch(0.1f, out_perm_reflectY,out2_perm_reflectY, shape_augment);
+  /*
+      We assume structures of struct_size*sizeof(float)
+  */
+  std::string ecs_info =
+      std::to_string(struct_size) + "_" + vec2String(var_offsets) + "_" +
+      std::to_string(nstructs) + "_" + std::to_string(noffsets);
 
-    permute_reflect_y_reflect_x2D(base_img, out_perm_reflectX_reflectY, shape_in);
-    IntensityScaleBatch(0.1f, out_perm_reflectX_reflectY, out2_perm_reflectX_reflectY, shape_augment);
+  float *entities_aos = new float[struct_size * nstructs];
+  float *entities_soa = new float[struct_size * nstructs];
+  randomize_region_deterministic_float(entities_aos, struct_size * nstructs);
 
-
-
-    permute_rot_left2D(base_img, out_perm_rotLeft, shape_in);
-    IntensityScaleBatch(0.1f, out_perm_rotLeft,  out2_perm_rotLeft, shape_augment);
-
-
-
-    permute_reflectx_rot_left2D(base_img, out_perm_rotLeft_reflectX, shape_in);
-    IntensityScaleBatch(0.1f, out_perm_rotLeft_reflectX,out2_perm_rotLeft_reflectX, shape_augment);
-
-
-
-    permute_rot_right2D(base_img, out_perm_rotRight, shape_in);
-    IntensityScaleBatch(0.1f, out_perm_rotRight, out2_perm_rotRight, shape_augment);
-
-
-
-    permute_reflectx_rot_right2D(base_img, out_perm_rotRight_reflectX, shape_in);
-    IntensityScaleBatch(0.1f, out_perm_rotRight_reflectX, out2_perm_rotRight_reflectX, shape_augment);
-    // we can do the conv later
-
-
-    perf.CollectDelta();
-        results += "img_augmentation_cpu," + perf.PrintCounters() + ",0\n";
-
-
-    delete[] out2_perm_reflectX;
-    delete[] out2_perm_reflectY;
-    delete[] out2_perm_reflectX_reflectY;
-    delete[] out2_perm_rotLeft;
-    delete[] out2_perm_rotLeft_reflectX;
-    delete[] out2_perm_rotRight;
-    delete[] out2_perm_rotRight_reflectX;
-
-
-
-    float* out3_perm_reflectX = new float[n*c*h*w];
-    float* out3_perm_reflectY = new float[n*c*h*w];
-    float* out3_perm_reflectX_reflectY = new float[n*c*h*w];
-    float* out3_perm_rotLeft = new float[n*c*h*w];
-    float* out3_perm_rotLeft_reflectX = new float[n*c*h*w];
-    float* out3_perm_rotRight = new float[n*c*h*w];
-    float* out3_perm_rotRight_reflectX = new float[n*c*h*w];  
-
-
-
-
-
-    DTL::EphemeralRegion* base_ephemeral = api->AllocEphemeralRegion(n*h*w*c*sizeof(float));
-    float* base_write = (float*)base_ephemeral->GetHeadlessWriteregion();
-    randomize_region_deterministic_float(base_write, n*c*h*w);
-    DTL::EphemeralRegion* ephemeral_reflectX = api->CloneEphemeralRegion(base_ephemeral);
-    DTL::EphemeralRegion* ephemeral_reflectY = api->CloneEphemeralRegion(base_ephemeral);
-    DTL::EphemeralRegion* ephemeral_reflectX_reflectY = api->CloneEphemeralRegion(base_ephemeral);
-    DTL::EphemeralRegion* ephemeral_rotLeft = api->CloneEphemeralRegion(base_ephemeral);
-    DTL::EphemeralRegion* ephemeral_reflectX_rotLeft  = api->CloneEphemeralRegion(base_ephemeral);
-    DTL::EphemeralRegion* ephemeral_rotRight = api->CloneEphemeralRegion(base_ephemeral);
-    DTL::EphemeralRegion* ephemeral_reflectX_rotRight = api->CloneEphemeralRegion(base_ephemeral);
-
-
-    if (!api->Compile(permute_reflectX_Conf)) {
-        printf("Failed to compile dtl program or map onto agu1\n");
-        return "Failed to compile dtl program or map onto agu\n";
+  /*
+      We initialize first with aos, transform into soa. DTU will access an aos
+     base
+  */
+  for (int n = 0; n < nstructs; n++) {
+    for (int j = 0; j < struct_size; j++) // struct members
+    {
+      entities_soa[j * nstructs + n] = entities_aos[n * struct_size + j];
     }
-    api->ProgramHardware(ephemeral_reflectX);
-    float* reflectX_read = (float*)ephemeral_reflectX->GetHeadlessReadRegion();
+  }
 
+  printf("converted to soa\n");
 
-    if (!api->Compile(permute_reflectY_Conf)) {
-        printf("Failed to compile dtl program or map onto agu2\n");
-        return "Failed to compile dtl program or map onto agu\n";
+  float out_threshold = 0.0f;
+  float out_threshold2 = 0.0f;
+
+  /*
+      We are comparing to an already locality optimized arrangement
+  */
+  perf.CollectCounters();
+  for (int i = 0; i < nstructs; i++) {
+    for (int j = 0; j < noffsets; j++) {
+      out_threshold += entities_soa[j * nstructs + i];
     }
-    api->ProgramHardware(ephemeral_reflectY);
-    float* reflectY_read = (float*)ephemeral_reflectY->GetHeadlessReadRegion();
+  }
+  out_threshold /= (nstructs * noffsets);
+  perf.CollectDelta();
 
-    if (!api->Compile(permute_reflectX_reflectY_Conf)) {
-        printf("Failed to compile dtl program or map onto agu3\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_reflectX_reflectY);
-    float* reflectX_reflectY_read = (float*)ephemeral_reflectX_reflectY->GetHeadlessReadRegion();
+  results += "ecs_cpu," + std::to_string(0) + "," + perf.PrintCounters() + "," +
+             std::to_string(out_threshold) + "\n";
 
+  printf("done CPU\n");
+  perf.ClearCounters();
 
-    if (!api->Compile(permute_rotateLeft_Conf)) {
-        printf("Failed to compile dtl program or map onto agu4\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_rotLeft);
-    float* rotLeft_read = (float*)ephemeral_rotLeft->GetHeadlessReadRegion();
+  DTL::EphemeralRegion *base_ephemeral =
+      api->AllocEphemeralRegion(struct_size * nstructs * sizeof(float));
+  float *base_write = (float *)base_ephemeral->GetHeadlessWriteregion();
+  float *base_read = (float *)base_ephemeral->GetHeadlessReadRegion();
+  randomize_region_deterministic_float(base_write, struct_size * nstructs);
 
+  if (!api->Compile(soa_config)) {
+    printf("Failed to compile dtl program or map onto agu\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
 
-    if (!api->Compile(permute_rotateLeft_reflectX_Conf)) {
-        printf("Failed to compile dtl program or map onto agu5\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_reflectX_rotLeft);
-    float* reflectX_rotLeft_read = (float*)ephemeral_reflectX_rotLeft->GetHeadlessReadRegion();
+  perf.CollectCounters();
+  int x = 0;
+  for (int i = 0; i < nstructs * noffsets; i++) {
+    out_threshold2 += base_read[x++];
+  }
 
-    
+  out_threshold2 /= (nstructs * noffsets);
+  perf.CollectDelta();
+  results += "ecs_dtu," + std::to_string(0) + "," + perf.PrintCounters() + "," +
+             std::to_string(out_threshold2) + "\n";
 
-    if (!api->Compile(permute_rotateRight_Conf)) {
-        printf("Failed to compile dtl program or map onto agu6\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_rotRight);
-    float* rotRight_read = (float*)ephemeral_rotRight->GetHeadlessReadRegion();
+  printf("done DTU\n");
 
+  perf.ClearCounters();
 
-    if (!api->Compile(permute_rotateRight_reflectX_Conf)) {
-        printf("Failed to compile dtl program or map onto agu7\n");
-        return "Failed to compile dtl program or map onto agu\n";
-    }
-    api->ProgramHardware(ephemeral_reflectX_rotRight);
-    float* reflectX_rotRight_read = (float*)ephemeral_reflectX_rotRight->GetHeadlessReadRegion();
+  delete[] entities_soa;
+  delete[] entities_aos;
+  api->FreeEphemeralRegion(base_ephemeral);
 
+  return results;
+}
 
+std::string
+benchmark::bench_wrapper_imageAugmentation(const BenchmarkData &bench_data,
+                                           DTL::API *api) {
+  std::string results = "";
+  PerfManager perf;
 
+  assert(bench_data.params.find("NMAX") != bench_data.params.end());
+  assert(bench_data.params.find("CMAX") != bench_data.params.end());
+  assert(bench_data.params.find("HMAX") != bench_data.params.end());
+  assert(bench_data.params.find("WMAX") != bench_data.params.end());
 
-    perf.CollectCounters();
-    IntensityScaleBatch(0.1f, reflectX_read, out3_perm_reflectX, shape_augment);
+  assert(bench_data.constants.find("H") != bench_data.constants.end());
+  assert(bench_data.constants.find("W") != bench_data.constants.end());
+  assert(bench_data.constants.find("stride_n") != bench_data.constants.end());
+  assert(bench_data.constants.find("stride_h") != bench_data.constants.end());
+  assert(bench_data.constants.find("stride_w") != bench_data.constants.end());
 
-    IntensityScaleBatch(0.1f, reflectY_read, out3_perm_reflectY, shape_augment);
+  assert(bench_data.other.find("ksize") != bench_data.other.end());
+  assert(bench_data.other.find("use_real_image") != bench_data.other.end());
 
-    IntensityScaleBatch(0.1f, reflectX_reflectY_read, out3_perm_reflectX_reflectY, shape_augment);
+  auto n = static_cast<int>(bench_data.params.at("NMAX"));
+  auto c = static_cast<int>(bench_data.params.at("CMAX"));
+  auto h = static_cast<int>(bench_data.params.at("HMAX"));
+  auto w = static_cast<int>(bench_data.params.at("WMAX"));
+  std::string img_info = std::to_string(n) + "_" + std::to_string(c) + "_" +
+                         std::to_string(h) + "_" + std::to_string(w);
+  /*
+      We instantiate the seven augmentations,
+  */
 
-    IntensityScaleBatch(0.1f, rotLeft_read,  out3_perm_rotLeft, shape_augment);
+  printf("Got params\n");
+  BenchmarkData permute_reflectX_data = bench_data;
+  BenchmarkData permute_reflectY_data = bench_data;
+  BenchmarkData permute_reflectX_reflectY_data = bench_data;
+  BenchmarkData permute_rotateLeft_data = bench_data;
+  BenchmarkData permute_rotateLeft_reflectX_data = bench_data;
+  BenchmarkData permute_rotateRight_data = bench_data;
+  BenchmarkData permute_rotateRight_reflextX_data = bench_data;
+  permute_reflectX_data.name = "permute_reflect";
+  permute_reflectY_data.name = "permute_flipy";
+  permute_reflectX_reflectY_data.name = "permute_flipy_reflect";
+  permute_rotateLeft_data.name = "permute_rot_left";
+  permute_rotateLeft_reflectX_data.name = "permute_rot_left_reflect";
+  permute_rotateRight_data.name = "permute_rot_right";
+  permute_rotateRight_reflextX_data.name = "permute_rot_right_reflect";
 
-    IntensityScaleBatch(0.1f, reflectX_rotLeft_read, out3_perm_rotLeft_reflectX, shape_augment);
+  std::string permute_reflectX_Conf =
+      CreateBenchmarkConfig(permute_reflectX_data);
+  std::string permute_reflectY_Conf =
+      CreateBenchmarkConfig(permute_reflectY_data);
+  std::string permute_reflectX_reflectY_Conf =
+      CreateBenchmarkConfig(permute_reflectX_reflectY_data);
+  std::string permute_rotateLeft_Conf =
+      CreateBenchmarkConfig(permute_rotateLeft_data);
+  std::string permute_rotateLeft_reflectX_Conf =
+      CreateBenchmarkConfig(permute_rotateLeft_reflectX_data);
+  std::string permute_rotateRight_Conf =
+      CreateBenchmarkConfig(permute_rotateRight_data);
+  std::string permute_rotateRight_reflectX_Conf =
+      CreateBenchmarkConfig(permute_rotateRight_reflextX_data);
+  printf("Created config\n");
 
-    IntensityScaleBatch(0.1f, rotRight_read, out3_perm_rotRight, shape_augment);
+  // Now we assume all of these are compiled ahead of time, and we either can
+  // use 7 configs, or swap them mid run
+  float *base_img = new float[n * c * h * w];
+  float *out_perm_reflectX = new float[n * c * h * w];
+  float *out_perm_reflectY = new float[n * c * h * w];
+  float *out_perm_reflectX_reflectY = new float[n * c * h * w];
+  float *out_perm_rotLeft = new float[n * c * h * w];
+  float *out_perm_rotLeft_reflectX = new float[n * c * h * w];
+  float *out_perm_rotRight = new float[n * c * h * w];
+  float *out_perm_rotRight_reflectX = new float[n * c * h * w];
+  float *out2_perm_reflectX = new float[n * c * h * w];
+  float *out2_perm_reflectY = new float[n * c * h * w];
+  float *out2_perm_reflectX_reflectY = new float[n * c * h * w];
+  float *out2_perm_rotLeft = new float[n * c * h * w];
+  float *out2_perm_rotLeft_reflectX = new float[n * c * h * w];
+  float *out2_perm_rotRight = new float[n * c * h * w];
+  float *out2_perm_rotRight_reflectX = new float[n * c * h * w];
 
-    IntensityScaleBatch(0.1f, reflectX_rotRight_read, out3_perm_rotRight_reflectX, shape_augment);
-    // we can do the conv later
+  randomize_region_deterministic_float(base_img, n * c * h * w);
+  printf("allocated regions\n");
 
-    perf.CollectDelta();
+  uint64_t transform_cycles = 0;
+  uint64_t start;
+  uint64_t end;
+  perf.CollectCounters();
+  Shape shape_in({n, h, w, c});
+  Shape shape_augment({n, c, h, w});
+  start = read_cycle();
+  permute_reflect_x2D(base_img, out_perm_reflectX, shape_in);
+  end = read_cycle();
+  transform_cycles += end - start;
+  IntensityScaleBatch(
+      0.1f, out_perm_reflectX, out2_perm_reflectX, shape_augment);
 
-    results += "img_augmentation_dtu," + perf.PrintCounters() + ",0\n";
+  start = read_cycle();
+  permute_reflect_y2D(base_img, out_perm_reflectY, shape_in);
+  end = read_cycle();
+  transform_cycles += end - start;
+  IntensityScaleBatch(
+      0.1f, out_perm_reflectY, out2_perm_reflectY, shape_augment);
 
+  start = read_cycle();
+  permute_reflect_y_reflect_x2D(base_img, out_perm_reflectX_reflectY, shape_in);
+  end = read_cycle();
+  transform_cycles += end - start;
+  IntensityScaleBatch(0.1f,
+                      out_perm_reflectX_reflectY,
+                      out2_perm_reflectX_reflectY,
+                      shape_augment);
 
-    printf("reflectX cpu %s -- dtu %s\n", std::to_string(print_checksum_float(out_perm_reflectX, n*c*h*w)).c_str(), std::to_string(print_checksum_float(reflectX_read, n*c*h*w)).c_str());
-    printf("reflectY cpu %s -- dtu %s\n", std::to_string(print_checksum_float(out_perm_reflectY, n*c*h*w)).c_str(), std::to_string(print_checksum_float(reflectY_read, n*c*h*w)).c_str());
-    printf("reflectX_reflectY cpu %s -- dtu %s\n", std::to_string(print_checksum_float(out_perm_reflectX_reflectY, n*c*h*w)).c_str(), std::to_string(print_checksum_float(reflectX_reflectY_read, n*c*h*w)).c_str());
-    printf("rotLeft cpu %s -- dtu %s\n", std::to_string(print_checksum_float(out_perm_rotLeft, n*c*h*w)).c_str(), std::to_string(print_checksum_float(rotLeft_read, n*c*h*w)).c_str());
-    printf("reflectX_rotLeft cpu %s -- dtu %s\n", std::to_string(print_checksum_float(out_perm_rotLeft_reflectX, n*c*h*w)).c_str(), std::to_string(print_checksum_float(reflectX_rotLeft_read, n*c*h*w)).c_str());
-    printf("rotRight cpu %s -- dtu %s\n", std::to_string(print_checksum_float(out_perm_rotRight, n*c*h*w)).c_str(), std::to_string(print_checksum_float(rotRight_read, n*c*h*w)).c_str());
-    printf("reflectX_rotRight cpu %s -- dtu %s\n", std::to_string(print_checksum_float(out_perm_rotRight_reflectX, n*c*h*w)).c_str(), std::to_string(print_checksum_float(reflectX_rotRight_read, n*c*h*w)).c_str());
+  start = read_cycle();
+  permute_rot_left2D(base_img, out_perm_rotLeft, shape_in);
+  end = read_cycle();
+  transform_cycles += end - start;
+  IntensityScaleBatch(0.1f, out_perm_rotLeft, out2_perm_rotLeft, shape_augment);
 
+  start = read_cycle();
+  permute_reflectx_rot_left2D(base_img, out_perm_rotLeft_reflectX, shape_in);
+  end = read_cycle();
+  transform_cycles += end - start;
+  IntensityScaleBatch(0.1f,
+                      out_perm_rotLeft_reflectX,
+                      out2_perm_rotLeft_reflectX,
+                      shape_augment);
 
+  start = read_cycle();
+  permute_rot_right2D(base_img, out_perm_rotRight, shape_in);
+  end = read_cycle();
+  transform_cycles += end - start;
+  IntensityScaleBatch(
+      0.1f, out_perm_rotRight, out2_perm_rotRight, shape_augment);
 
-    api->FreeEphemeralRegion(base_ephemeral);
-    api->FreeEphemeralRegion(ephemeral_reflectX);
-    api->FreeEphemeralRegion(ephemeral_reflectY);
-    api->FreeEphemeralRegion(ephemeral_reflectX_reflectY);
-    api->FreeEphemeralRegion(ephemeral_rotLeft);
-    api->FreeEphemeralRegion(ephemeral_rotRight);
-    api->FreeEphemeralRegion(ephemeral_reflectX_rotLeft);
-    api->FreeEphemeralRegion(ephemeral_reflectX_rotRight);
+  start = read_cycle();
+  permute_reflectx_rot_right2D(base_img, out_perm_rotRight_reflectX, shape_in);
+  end = read_cycle();
+  transform_cycles += end - start;
+  IntensityScaleBatch(0.1f,
+                      out_perm_rotRight_reflectX,
+                      out2_perm_rotRight_reflectX,
+                      shape_augment);
+  // we can do the conv later
 
+  perf.CollectDelta();
+  results += "img_augmentation_" + std::to_string(h) + "_" + std::to_string(n) + ",cpu," + std::to_string(transform_cycles) + "," +
+             perf.PrintCounters() + ",0\n";
 
+  delete[] out2_perm_reflectX;
+  delete[] out2_perm_reflectY;
+  delete[] out2_perm_reflectX_reflectY;
+  delete[] out2_perm_rotLeft;
+  delete[] out2_perm_rotLeft_reflectX;
+  delete[] out2_perm_rotRight;
+  delete[] out2_perm_rotRight_reflectX;
 
-    delete[] out3_perm_reflectX;
-    delete[] out3_perm_reflectY;
-    delete[] out3_perm_reflectX_reflectY;
-    delete[] out3_perm_rotLeft;
-    delete[] out3_perm_rotLeft_reflectX;
-    delete[] out3_perm_rotRight;
-    delete[] out3_perm_rotRight_reflectX;
+  float *out3_perm_reflectX = new float[n * c * h * w];
+  float *out3_perm_reflectY = new float[n * c * h * w];
+  float *out3_perm_reflectX_reflectY = new float[n * c * h * w];
+  float *out3_perm_rotLeft = new float[n * c * h * w];
+  float *out3_perm_rotLeft_reflectX = new float[n * c * h * w];
+  float *out3_perm_rotRight = new float[n * c * h * w];
+  float *out3_perm_rotRight_reflectX = new float[n * c * h * w];
 
-    delete[] base_img; // wait so we can hash
-    delete[] out_perm_reflectX;
-    delete[] out_perm_reflectY;
-    delete[] out_perm_reflectX_reflectY;
-    delete[] out_perm_rotLeft;
-    delete[] out_perm_rotLeft_reflectX;
-    delete[] out_perm_rotRight;
-    delete[] out_perm_rotRight_reflectX;
+  DTL::EphemeralRegion *base_ephemeral =
+      api->AllocEphemeralRegion(n * h * w * c * sizeof(float));
+  float *base_write = (float *)base_ephemeral->GetHeadlessWriteregion();
+  randomize_region_deterministic_float(base_write, n * c * h * w);
+  DTL::EphemeralRegion *ephemeral_reflectX =
+      api->CloneEphemeralRegion(base_ephemeral);
+  DTL::EphemeralRegion *ephemeral_reflectY =
+      api->CloneEphemeralRegion(base_ephemeral);
+  DTL::EphemeralRegion *ephemeral_reflectX_reflectY =
+      api->CloneEphemeralRegion(base_ephemeral);
+  DTL::EphemeralRegion *ephemeral_rotLeft =
+      api->CloneEphemeralRegion(base_ephemeral);
+  DTL::EphemeralRegion *ephemeral_reflectX_rotLeft =
+      api->CloneEphemeralRegion(base_ephemeral);
+  DTL::EphemeralRegion *ephemeral_rotRight =
+      api->CloneEphemeralRegion(base_ephemeral);
+  DTL::EphemeralRegion *ephemeral_reflectX_rotRight =
+      api->CloneEphemeralRegion(base_ephemeral);
 
-    return results;
+  if (!api->Compile(permute_reflectX_Conf)) {
+    printf("Failed to compile dtl program or map onto agu1\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
+  api->ProgramHardware(ephemeral_reflectX);
+  float *reflectX_read = (float *)ephemeral_reflectX->GetHeadlessReadRegion();
+
+  if (!api->Compile(permute_reflectY_Conf)) {
+    printf("Failed to compile dtl program or map onto agu2\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
+  api->ProgramHardware(ephemeral_reflectY);
+  float *reflectY_read = (float *)ephemeral_reflectY->GetHeadlessReadRegion();
+
+  if (!api->Compile(permute_reflectX_reflectY_Conf)) {
+    printf("Failed to compile dtl program or map onto agu3\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
+  api->ProgramHardware(ephemeral_reflectX_reflectY);
+  float *reflectX_reflectY_read =
+      (float *)ephemeral_reflectX_reflectY->GetHeadlessReadRegion();
+
+  if (!api->Compile(permute_rotateLeft_Conf)) {
+    printf("Failed to compile dtl program or map onto agu4\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
+  api->ProgramHardware(ephemeral_rotLeft);
+  float *rotLeft_read = (float *)ephemeral_rotLeft->GetHeadlessReadRegion();
+
+  if (!api->Compile(permute_rotateLeft_reflectX_Conf)) {
+    printf("Failed to compile dtl program or map onto agu5\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
+  api->ProgramHardware(ephemeral_reflectX_rotLeft);
+  float *reflectX_rotLeft_read =
+      (float *)ephemeral_reflectX_rotLeft->GetHeadlessReadRegion();
+
+  if (!api->Compile(permute_rotateRight_Conf)) {
+    printf("Failed to compile dtl program or map onto agu6\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
+  api->ProgramHardware(ephemeral_rotRight);
+  float *rotRight_read = (float *)ephemeral_rotRight->GetHeadlessReadRegion();
+
+  if (!api->Compile(permute_rotateRight_reflectX_Conf)) {
+    printf("Failed to compile dtl program or map onto agu7\n");
+    return "Failed to compile dtl program or map onto agu\n";
+  }
+  api->ProgramHardware(ephemeral_reflectX_rotRight);
+  float *reflectX_rotRight_read =
+      (float *)ephemeral_reflectX_rotRight->GetHeadlessReadRegion();
+
+  perf.CollectCounters();
+  IntensityScaleBatch(0.1f, reflectX_read, out3_perm_reflectX, shape_augment);
+
+  IntensityScaleBatch(0.1f, reflectY_read, out3_perm_reflectY, shape_augment);
+
+  IntensityScaleBatch(
+      0.1f, reflectX_reflectY_read, out3_perm_reflectX_reflectY, shape_augment);
+
+  IntensityScaleBatch(0.1f, rotLeft_read, out3_perm_rotLeft, shape_augment);
+
+  IntensityScaleBatch(
+      0.1f, reflectX_rotLeft_read, out3_perm_rotLeft_reflectX, shape_augment);
+
+  IntensityScaleBatch(0.1f, rotRight_read, out3_perm_rotRight, shape_augment);
+
+  IntensityScaleBatch(
+      0.1f, reflectX_rotRight_read, out3_perm_rotRight_reflectX, shape_augment);
+  // we can do the conv later
+
+  perf.CollectDelta();
+
+  results += "img_augmentation_" + std::to_string(h) + "_" + std::to_string(n) + ",dtu," + std::string("0,") + perf.PrintCounters() + ",0\n";
+ // std::cout << results << "\n";
+
+  printf("reflectX cpu %s -- dtu %s\n",
+         std::to_string(print_checksum_float(out_perm_reflectX, n * c * h * w))
+             .c_str(),
+         std::to_string(print_checksum_float(reflectX_read, n * c * h * w))
+             .c_str());
+  printf("reflectY cpu %s -- dtu %s\n",
+         std::to_string(print_checksum_float(out_perm_reflectY, n * c * h * w))
+             .c_str(),
+         std::to_string(print_checksum_float(reflectY_read, n * c * h * w))
+             .c_str());
+  printf("reflectX_reflectY cpu %s -- dtu %s\n",
+         std::to_string(
+             print_checksum_float(out_perm_reflectX_reflectY, n * c * h * w))
+             .c_str(),
+         std::to_string(
+             print_checksum_float(reflectX_reflectY_read, n * c * h * w))
+             .c_str());
+  printf("rotLeft cpu %s -- dtu %s\n",
+         std::to_string(print_checksum_float(out_perm_rotLeft, n * c * h * w))
+             .c_str(),
+         std::to_string(print_checksum_float(rotLeft_read, n * c * h * w))
+             .c_str());
+  printf(
+      "reflectX_rotLeft cpu %s -- dtu %s\n",
+      std::to_string(
+          print_checksum_float(out_perm_rotLeft_reflectX, n * c * h * w))
+          .c_str(),
+      std::to_string(print_checksum_float(reflectX_rotLeft_read, n * c * h * w))
+          .c_str());
+  printf("rotRight cpu %s -- dtu %s\n",
+         std::to_string(print_checksum_float(out_perm_rotRight, n * c * h * w))
+             .c_str(),
+         std::to_string(print_checksum_float(rotRight_read, n * c * h * w))
+             .c_str());
+  printf("reflectX_rotRight cpu %s -- dtu %s\n",
+         std::to_string(
+             print_checksum_float(out_perm_rotRight_reflectX, n * c * h * w))
+             .c_str(),
+         std::to_string(
+             print_checksum_float(reflectX_rotRight_read, n * c * h * w))
+             .c_str());
+
+  api->FreeEphemeralRegion(base_ephemeral);
+  api->FreeEphemeralRegion(ephemeral_reflectX);
+  api->FreeEphemeralRegion(ephemeral_reflectY);
+  api->FreeEphemeralRegion(ephemeral_reflectX_reflectY);
+  api->FreeEphemeralRegion(ephemeral_rotLeft);
+  api->FreeEphemeralRegion(ephemeral_rotRight);
+  api->FreeEphemeralRegion(ephemeral_reflectX_rotLeft);
+  api->FreeEphemeralRegion(ephemeral_reflectX_rotRight);
+
+  delete[] out3_perm_reflectX;
+  delete[] out3_perm_reflectY;
+  delete[] out3_perm_reflectX_reflectY;
+  delete[] out3_perm_rotLeft;
+  delete[] out3_perm_rotLeft_reflectX;
+  delete[] out3_perm_rotRight;
+  delete[] out3_perm_rotRight_reflectX;
+
+  delete[] base_img; // wait so we can hash
+  delete[] out_perm_reflectX;
+  delete[] out_perm_reflectY;
+  delete[] out_perm_reflectX_reflectY;
+  delete[] out_perm_rotLeft;
+  delete[] out_perm_rotLeft_reflectX;
+  delete[] out_perm_rotRight;
+  delete[] out_perm_rotRight_reflectX;
+
+  return results;
 }
 
 std::string benchmark::bench_wrapper_imageAugmentation_fuse(const BenchmarkData &bench_data, DTL::API *api) 
@@ -1028,13 +707,10 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
   uint32_t out_data_size = out_height * out_width * channels_out;
   uint32_t im2col_matsize =
       channels_in * (height - ksize + 1) * (width - ksize + 1) * ksize * ksize;
-  unsigned int buf_size = 3 * 1078 * 3 * 3 * 1918;
-
+    printf("matsize 0x%x\n", im2col_matsize);
   float *im2col_cpu_matrix = new float[im2col_matsize];
   float *in_data = new float[in_data_size];
-  float *filter_matrix =
-      new float[channels_out * channels_in * ksize *
-                ksize]; // each C_Out applies a ksize*ksize filter to each C_In
+  float *filter_matrix = new float[channels_out * channels_in * ksize * ksize]; // each C_Out applies a ksize*ksize filter to each C_In
 
   float *outbuf = new float[out_height * out_width * channels_out];
   float *outbuf2 = new float[out_height * out_width * channels_out];
@@ -1043,7 +719,12 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
   randomize_region_deterministic_float(filter_matrix, channels_out * channels_in * ksize * ksize);
 
   // CPU benchmark
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
   perf.CollectCounters();
+  start = read_cycle();
   im2col_cpu(in_data,
              channels_in,
              height,
@@ -1052,10 +733,12 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
              stride,
              pad,
              im2col_cpu_matrix);
+    end = read_cycle();
+    transform_cycles = end - start;
   matmult_conv_blocked(filter_matrix, im2col_cpu_matrix, outbuf, M, K, N);
   perf.CollectDelta();
   results +=
-      "im2col_" + img_info + "," + "cpu," + perf.PrintCounters() + "," +
+      "im2col_" + img_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters() + "," +
       std::to_string(print_checksum_float(im2col_cpu_matrix, im2col_matsize)) +
       "\n";
   printf("done cpu\n");
@@ -1066,8 +749,10 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
   // CPU benchmark
 
   perf.ClearCounters();
-  DTL::EphemeralRegion *ephemeral =
-      api->AllocEphemeralRegion(im2col_matsize * sizeof(float));
+
+
+  printf("matsize 0x%x\n", im2col_matsize*sizeof(float));
+  DTL::EphemeralRegion *ephemeral = api->AllocEphemeralRegion(im2col_matsize * sizeof(float));
 
   if (!api->Compile(conf)) {
     printf("Failed to compile dtl program or map onto agu\n");
@@ -1083,7 +768,7 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
   matmult_conv_blocked(filter_matrix, Ar, outbuf2, M, K, N);
   perf.CollectDelta();
 
-  results += "im2col_" + img_info + "," + "dtu," + perf.PrintCounters() + "," +
+  results += "im2col_" + img_info + "," + "dtu," + "0," + perf.PrintCounters() + "," +
              std::to_string(print_checksum_float(Ar, im2col_matsize)) + "\n";
   if (bench_data.output_artifact.size())
     dump_buffer_to_disk("./artifacts/im2col_dtu_" + img_info,
@@ -1139,6 +824,10 @@ std::string benchmark::bench_wrapper_db_colproject(const BenchmarkData &bench_da
     uint32_t* write_out2 = new uint32_t[col_count*row_count];
     randomize_region_deterministic(reinterpret_cast<uint8_t*>(db_cpu), db_size); // write dummy data to database
     
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     perf.CollectCounters();
     int out_write_index1 = 0;
     for (int i = 0; i < row_count; i++)
@@ -1149,7 +838,7 @@ std::string benchmark::bench_wrapper_db_colproject(const BenchmarkData &bench_da
         }
     }
     perf.CollectDelta();
-    results += "dbcolproj_" + db_info + "," + "cpu," + perf.PrintCounters() + "," + print_checksum_ul(write_out1, col_count*row_count) + "\n";
+    results += "dbcolproj_" + db_info + "," + "cpu," + std::to_string(0) + ","  + perf.PrintCounters() + "," + print_checksum_ul(write_out1, col_count*row_count) + "\n";
 
     perf.ClearCounters();
     DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(db_size);
@@ -1174,7 +863,7 @@ std::string benchmark::bench_wrapper_db_colproject(const BenchmarkData &bench_da
         }
     }
     perf.CollectDelta();
-    results += "dbcolproj_" + db_info + "," + "dtu," + perf.PrintCounters()  + "," + print_checksum_ul(write_out2, col_count*row_count) + "\n";
+    results += "dbcolproj_" + db_info + "," + "dtu," + "0,"  + perf.PrintCounters()  + "," + print_checksum_ul(write_out2, col_count*row_count) + "\n";
 
 
 
@@ -1211,13 +900,22 @@ std::string benchmark::bench_wrapper_matmul_transpose(const BenchmarkData &bench
     int* Bt = new int[nrows*ncols];
     int* C1 = new int[nrows*ncols];
     int* C2 = new int[nrows*ncols];
+
+
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     init_data_int(A, B, C1, nrows);
     printf("A %s\n", print_checksum_i32(A, nrows*ncols).c_str());
     perf.CollectCounters();
+    start = read_cycle();
     transpose_naive_int(B, Bt, nrows, ncols);
+    end = read_cycle();
+    transform_cycles = end - start;
     matmult_opt3_pretransposed_int(A, Bt, C1, nrows);
     perf.CollectDelta();
-    results += "matmul_transpose_" + mat_info + "," + "cpu," + perf.PrintCounters()  + "," + print_checksum_i32(Bt, nrows*ncols) + "\n";
+    results += "matmul_transpose_" + mat_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters()  + "," + print_checksum_i32(Bt, nrows*ncols) + "\n";
 
 
     perf.ClearCounters();
@@ -1238,7 +936,7 @@ std::string benchmark::bench_wrapper_matmul_transpose(const BenchmarkData &bench
 
 
     printf("checksum A %s\n", print_checksum_i32(A, nrows*ncols).c_str());
-    results += "matmul_transpose_" + mat_info + "," + "dtu," + perf.PrintCounters()   + "," + print_checksum_i32(Ar, nrows*ncols) + "\n";
+    results += "matmul_transpose_" + mat_info + "," + "dtu," + "0,"  + perf.PrintCounters()   + "," + print_checksum_i32(Ar, nrows*ncols) + "\n";
 
 
         for(int i=0; i<100; i++)
@@ -1301,8 +999,14 @@ std::string benchmark::bench_wrapper_nhwc_permutation(const BenchmarkData &bench
     }
      printf("starting bench\n");
 
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     perf.CollectCounters();
+    start = read_cycle();
     nhwc_to_nchw_cpu(base_img, batch_size, channels, img_size, img_size, img_nchw);
+    end = read_cycle();
+    transform_cycles = end - start;
     for (int n = 0; n < batch_size; n++)
     {
         for (int c = 0; c < channels; c++)
@@ -1312,7 +1016,7 @@ std::string benchmark::bench_wrapper_nhwc_permutation(const BenchmarkData &bench
         }
     }  
     perf.CollectDelta();
-    results += "nhwc_permutation_" + img_info + "," + "cpu," + perf.PrintCounters() + "," + std::to_string(print_checksum_float(img_nchw, batch_size*img_size*img_size*channels)) + "\n";
+    results += "nhwc_permutation_" + img_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters() + "," + std::to_string(print_checksum_float(img_nchw, batch_size*img_size*img_size*channels)) + "\n";
      
 
     printf("here\n");
@@ -1347,7 +1051,7 @@ std::string benchmark::bench_wrapper_nhwc_permutation(const BenchmarkData &bench
         }
     }  
     perf.CollectDelta();
-    results += "nhwc_permutation_" + img_info + "," + "dtu," + perf.PrintCounters() + "," + std::to_string(print_checksum_float(Ar, batch_size*img_size*img_size*channels)) + "\n";
+    results += "nhwc_permutation_" + img_info + "," + "dtu," + "0," + perf.PrintCounters() + "," + std::to_string(print_checksum_float(Ar, batch_size*img_size*img_size*channels)) + "\n";
     printf("finished bench\n");
 
 
@@ -1415,9 +1119,15 @@ std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data
     }
         
 
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     perf.CollectCounters();
     //nhwc_to_nchw_cpu(base_img, batch_size, channels, img_size, img_size, img_nchw);
+    start = read_cycle();
     batch_to_space(base_img, batch_size, channels, img_size, img_size, img_batch_transform);
+    end = read_cycle();
+    transform_cycles = end - start;
     for (int n = 0; n < batch_size; n++)
     {
         for (int c = 0; c < channels; c++)
@@ -1427,7 +1137,7 @@ std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data
         }
     }  
     perf.CollectDelta();
-    results += "batch2space_" + img_info + "," + "cpu," + perf.PrintCounters()  + "," + std::to_string(print_checksum_float(img_batch_transform, batch_size*img_size*img_size*channels)) + "\n";
+    results += "batch2space_" + img_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters()  + "," + std::to_string(print_checksum_float(img_batch_transform, batch_size*img_size*img_size*channels)) + "\n";
 
 
     
@@ -1460,13 +1170,8 @@ std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data
         }
     }  
     perf.CollectDelta();
-    results += "batch2space_" + img_info + "," + "dtu," + perf.PrintCounters() + "," + std::to_string(print_checksum_float(Ar, batch_size*img_size*img_size*channels)) + "\n";
+    results += "batch2space_" + img_info + "," + "dtu," + "0,"  + perf.PrintCounters() + "," + std::to_string(print_checksum_float(Ar, batch_size*img_size*img_size*channels)) + "\n";
 
-
-    for(int i=0; i<100; i++)
-    {
-        printf("batch2space %d: CPU=%f, DTU=%f\n", i, img_batch_transform[i], Ar[i]);
-    }
 
     delete[] base_img;
     delete[] img_batch;
@@ -1479,8 +1184,9 @@ std::string benchmark::bench_wrapper_batch2space(const BenchmarkData &bench_data
     return results;
 }
 
-std::string benchmark::bench_wrapper_tensorunfold(const BenchmarkData &bench_data, DTL::API *api) 
-{
+std::string
+benchmark::bench_wrapper_tensorunfold_mode1(const BenchmarkData &bench_data,
+                                            DTL::API *api) {
     std::string results;
     PerfManager perf;
     std::string conf = CreateBenchmarkConfig(bench_data);
@@ -1524,11 +1230,17 @@ std::string benchmark::bench_wrapper_tensorunfold(const BenchmarkData &bench_dat
     std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
 
 
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     perf.CollectCounters();
-    lower_mat_4d(lowered_mat, tensor_in, d1, d2, d3, d4, stride_d1, stride_d2, stride_d3);
+    start = read_cycle();
+    lower_mat_4d_mode1(lowered_mat, tensor_in, d1, d2, d3, d4, stride_d1, stride_d2, stride_d3);
+    end = read_cycle();
+    transform_cycles = end - start;
     hadamard(tensor_out1, lowered_mat, matrix_b, d3, d1*d2*d4);
     perf.CollectDelta();
-    results += "tensor_unfold_" + tensor_info + "," + "cpu," + perf.PrintCounters()  + "," + print_checksum_i32(lowered_mat, d1*d2*d3*d4) + "\n";
+    results += "tensor_unfold_1_" + tensor_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters()  + "," + print_checksum_i32(lowered_mat, d1*d2*d3*d4) + "\n";
 
     perf.ClearCounters();
     DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
@@ -1548,11 +1260,7 @@ std::string benchmark::bench_wrapper_tensorunfold(const BenchmarkData &bench_dat
     perf.CollectCounters();
     hadamard(tensor_out2, Ar, matrix_b2, d3, d1*d2*d4);
     perf.CollectDelta();
-    results += "tensor_unfold_" + tensor_info + "," + "dtu," + perf.PrintCounters()   + "," + print_checksum_i32(Ar, d1*d2*d3*d4) + "\n";
-    for(int i=0; i<100; i++)
-    {
-        printf("unfold %d: CPU=%d, DTU=%d\n", i, lowered_mat[i], Ar[i]);
-    }
+    results += "tensor_unfold_1_" + tensor_info + "," + "dtu," + "0,"  + perf.PrintCounters()   + "," + print_checksum_i32(Ar, d1*d2*d3*d4) + "\n";
     //delete[] tensor_in;
     delete[] lowered_mat; 
     delete[] tensor_out1;
@@ -1564,6 +1272,274 @@ std::string benchmark::bench_wrapper_tensorunfold(const BenchmarkData &bench_dat
     api->FreeEphemeralRegion(ephemeral);
     return results;
 }
+
+std::string
+benchmark::bench_wrapper_tensorunfold_mode2(const BenchmarkData &bench_data,
+                                            DTL::API *api) {
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+    assert(bench_data.params.find("D1") != bench_data.params.end());
+    assert(bench_data.params.find("D2") != bench_data.params.end());
+    assert(bench_data.params.find("D3") != bench_data.params.end());
+    assert(bench_data.params.find("D4") != bench_data.params.end());
+    assert(bench_data.constants.find("stride_d1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d2") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d3") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+
+    int d1 = bench_data.params.at("D1");
+    int d2 = bench_data.params.at("D2");
+    int d3 = bench_data.params.at("D3");
+    int d4 = bench_data.params.at("D4");
+    int stride_d1 = bench_data.constants.at("stride_d1")[0];
+    int stride_d2 = bench_data.constants.at("stride_d2")[0];
+    int stride_d3 = bench_data.constants.at("stride_d3")[0];
+
+    int* tensor_in = new int[d1*d2*d3*d4];
+    int* lowered_mat = new int[d1*d2*d3*d4];
+    int* tensor_out1 = new int[d1*d2*d3*d4];
+    int* tensor_out2 = new int[d1*d2*d3*d4];
+    int* matrix_b = new int[d1*d2*d3*d4];
+    int* matrix_b2 = new int[d1*d2*d3*d4];
+
+
+    assert(tensor_in != nullptr);
+    assert(lowered_mat != nullptr);
+    assert(tensor_out1 != nullptr);
+    assert(tensor_out2 != nullptr);
+    assert(matrix_b != nullptr);
+    assert(matrix_b2 != nullptr);
+
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_in), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b), d1*d2*d3*d4*sizeof(int));
+
+    std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
+
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
+    perf.CollectCounters();
+    start = read_cycle();
+    lower_mat_4d_mode2(lowered_mat, tensor_in, d1, d2, d3, d4, stride_d1, stride_d2, stride_d3);
+    end = read_cycle();
+    transform_cycles = end - start;
+    hadamard(tensor_out1, lowered_mat, matrix_b, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_2_" + tensor_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters()  + "," + print_checksum_i32(lowered_mat, d1*d2*d3*d4) + "\n";
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    int* Aw = (int*)ephemeral->GetHeadlessWriteregion();
+    int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b2), d1*d2*d3*d4*sizeof(int));
+
+
+    perf.CollectCounters();
+    hadamard(tensor_out2, Ar, matrix_b2, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_2_" + tensor_info + "," + "dtu," + "0,"  + perf.PrintCounters()   + "," + print_checksum_i32(Ar, d1*d2*d3*d4) + "\n";
+    //delete[] tensor_in;
+    delete[] lowered_mat; 
+    delete[] tensor_out1;
+    delete[] tensor_out2;
+    delete[] matrix_b;
+    delete[] matrix_b2; 
+    delete[] tensor_in;
+
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+}
+
+std::string
+benchmark::bench_wrapper_tensorunfold_mode3(const BenchmarkData &bench_data,
+                                            DTL::API *api) {
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+    assert(bench_data.params.find("D1") != bench_data.params.end());
+    assert(bench_data.params.find("D2") != bench_data.params.end());
+    assert(bench_data.params.find("D3") != bench_data.params.end());
+    assert(bench_data.params.find("D4") != bench_data.params.end());
+    assert(bench_data.constants.find("stride_d1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d2") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d3") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+
+    int d1 = bench_data.params.at("D1");
+    int d2 = bench_data.params.at("D2");
+    int d3 = bench_data.params.at("D3");
+    int d4 = bench_data.params.at("D4");
+    int stride_d1 = bench_data.constants.at("stride_d1")[0];
+    int stride_d2 = bench_data.constants.at("stride_d2")[0];
+    int stride_d3 = bench_data.constants.at("stride_d3")[0];
+
+    int* tensor_in = new int[d1*d2*d3*d4];
+    int* lowered_mat = new int[d1*d2*d3*d4];
+    int* tensor_out1 = new int[d1*d2*d3*d4];
+    int* tensor_out2 = new int[d1*d2*d3*d4];
+    int* matrix_b = new int[d1*d2*d3*d4];
+    int* matrix_b2 = new int[d1*d2*d3*d4];
+
+
+    assert(tensor_in != nullptr);
+    assert(lowered_mat != nullptr);
+    assert(tensor_out1 != nullptr);
+    assert(tensor_out2 != nullptr);
+    assert(matrix_b != nullptr);
+    assert(matrix_b2 != nullptr);
+
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_in), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b), d1*d2*d3*d4*sizeof(int));
+
+    std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
+
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
+    perf.CollectCounters();
+    start = read_cycle();
+    lower_mat_4d_mode3(lowered_mat, tensor_in, d1, d2, d3, d4, stride_d1, stride_d2, stride_d3);
+    end = read_cycle();
+    transform_cycles = end - start;
+    hadamard(tensor_out1, lowered_mat, matrix_b, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_3_" + tensor_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters()  + "," + print_checksum_i32(lowered_mat, d1*d2*d3*d4) + "\n";
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    int* Aw = (int*)ephemeral->GetHeadlessWriteregion();
+    int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b2), d1*d2*d3*d4*sizeof(int));
+
+
+    perf.CollectCounters();
+    hadamard(tensor_out2, Ar, matrix_b2, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_3_" + tensor_info + "," + "dtu," + "0,"  + perf.PrintCounters()   + "," + print_checksum_i32(Ar, d1*d2*d3*d4) + "\n";
+    //delete[] tensor_in;
+    delete[] lowered_mat; 
+    delete[] tensor_out1;
+    delete[] tensor_out2;
+    delete[] matrix_b;
+    delete[] matrix_b2; 
+    delete[] tensor_in;
+
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+}
+
+std::string
+benchmark::bench_wrapper_tensorunfold_mode4(const BenchmarkData &bench_data,
+                                            DTL::API *api) {
+    std::string results;
+    PerfManager perf;
+    std::string conf = CreateBenchmarkConfig(bench_data);
+
+    assert(bench_data.params.find("D1") != bench_data.params.end());
+    assert(bench_data.params.find("D2") != bench_data.params.end());
+    assert(bench_data.params.find("D3") != bench_data.params.end());
+    assert(bench_data.params.find("D4") != bench_data.params.end());
+    assert(bench_data.constants.find("stride_d1") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d2") != bench_data.constants.end());
+    assert(bench_data.constants.find("stride_d3") != bench_data.constants.end());
+    assert(bench_data.constants.find("data_size") != bench_data.constants.end());
+
+    int d1 = bench_data.params.at("D1");
+    int d2 = bench_data.params.at("D2");
+    int d3 = bench_data.params.at("D3");
+    int d4 = bench_data.params.at("D4");
+    int stride_d1 = bench_data.constants.at("stride_d1")[0];
+    int stride_d2 = bench_data.constants.at("stride_d2")[0];
+    int stride_d3 = bench_data.constants.at("stride_d3")[0];
+
+    int* tensor_in = new int[d1*d2*d3*d4];
+    int* lowered_mat = new int[d1*d2*d3*d4];
+    int* tensor_out1 = new int[d1*d2*d3*d4];
+    int* tensor_out2 = new int[d1*d2*d3*d4];
+    int* matrix_b = new int[d1*d2*d3*d4];
+    int* matrix_b2 = new int[d1*d2*d3*d4];
+
+
+    assert(tensor_in != nullptr);
+    assert(lowered_mat != nullptr);
+    assert(tensor_out1 != nullptr);
+    assert(tensor_out2 != nullptr);
+    assert(matrix_b != nullptr);
+    assert(matrix_b2 != nullptr);
+
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_in), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b), d1*d2*d3*d4*sizeof(int));
+
+    std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
+
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
+    perf.CollectCounters();
+    start = read_cycle();
+    lower_mat_4d_mode4(lowered_mat, tensor_in, d1, d2, d3, d4, stride_d1, stride_d2, stride_d3);
+    end = read_cycle();
+    transform_cycles = end - start;
+    hadamard(tensor_out1, lowered_mat, matrix_b, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_4_" + tensor_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters()  + "," + print_checksum_i32(lowered_mat, d1*d2*d3*d4) + "\n";
+
+    perf.ClearCounters();
+    DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
+
+    if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+    int* Aw = (int*)ephemeral->GetHeadlessWriteregion();
+    int* Ar = (int*)ephemeral->GetHeadlessReadRegion();
+
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(Aw), d1*d2*d3*d4*sizeof(int));
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(matrix_b2), d1*d2*d3*d4*sizeof(int));
+
+
+    perf.CollectCounters();
+    hadamard(tensor_out2, Ar, matrix_b2, d3, d1*d2*d4);
+    perf.CollectDelta();
+    results += "tensor_unfold_4_" + tensor_info + "," + "dtu," + "0,"  + perf.PrintCounters()   + "," + print_checksum_i32(Ar, d1*d2*d3*d4) + "\n";
+    //delete[] tensor_in;
+    delete[] lowered_mat; 
+    delete[] tensor_out1;
+    delete[] tensor_out2;
+    delete[] matrix_b;
+    delete[] matrix_b2; 
+    delete[] tensor_in;
+
+    api->FreeEphemeralRegion(ephemeral);
+    return results;
+}
+
 
 std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data, DTL::API *api) 
 {
@@ -1606,8 +1582,10 @@ std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data
     int* sliced_tensor = new int[n1*h1*w1*c1];
     int* tensor_out1 = new int[n1*h1*w1*c1];
     int* tensor_out2 = new int[n1*h1*w1*c1];
+    int* tensor_out_inplace = new int[n1*h1*w1*c1];
     int* tensor_b = new int[n1*h1*w1*c1];
     int* tensor_b2 = new int[n1*h1*w1*c1];
+    int* tensor_b_inplace = new int[n1*h1*w1*c1];
     assert(tensor_in != nullptr);
     assert(sliced_tensor != nullptr);
     assert(tensor_out1 != nullptr);
@@ -1622,13 +1600,36 @@ std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data
     std::string tensor_info = std::to_string(d1) + "x" + std::to_string(d2) + "x" + std::to_string(d3) + "x" + std::to_string(d4);
     tensor_info += "_" + std::to_string(stride_n1) + "x" + std::to_string(stride_h1) + "x" + std::to_string(stride_w1) + "x" + std::to_string(stride_c1);
 
+
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     perf.CollectCounters();
+    start = read_cycle();
     slice_tensor_int(sliced_tensor, tensor_in, n1, h1, w1, c1, stride_n1, stride_h1, stride_w1, stride_c1, stride_d1, stride_d2, stride_d3);
+    end = read_cycle();
+    transform_cycles  = end - start;
     hadamard_tensor_4d_int(tensor_out1, sliced_tensor, tensor_b, n1, h1, w1, c1);
     perf.CollectDelta();
-    results += "tensor_slicing_" + tensor_info + "," + "cpu," + perf.PrintCounters() + "," + print_checksum_i32(sliced_tensor, n1*h1*w1*c1) + "\n";
+    results += "tensor_slicing_" + tensor_info + "," + "cpu," + std::to_string(transform_cycles) + ","  + perf.PrintCounters() + "," + print_checksum_i32(sliced_tensor, n1*h1*w1*c1) + "\n";
 
     perf.ClearCounters();
+    
+    
+    
+    
+    randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_b_inplace), n1*h1*w1*c1*sizeof(int));
+    perf.CollectCounters();
+    hadamard_inPlace_int(tensor_out_inplace, tensor_in, tensor_b_inplace, n1, h1, w1, c1, stride_n1, stride_h1, stride_w1, stride_c1, stride_d1, stride_d2, stride_d3);
+    perf.CollectDelta();
+    results += "tensor_slicing_" + tensor_info + "," + "inplace," + "0,"  + perf.PrintCounters() + "," + print_checksum_i32(sliced_tensor, n1*h1*w1*c1) + "\n";
+    perf.ClearCounters();
+    
+    
+    
+    
+    
     DTL::EphemeralRegion* ephemeral = api->AllocEphemeralRegion(d1*d2*d3*d4*sizeof(int));
 
     if (!api->Compile(conf)) {
@@ -1643,10 +1644,14 @@ std::string benchmark::bench_wrapper_tensorslice(const BenchmarkData &bench_data
     randomize_region_deterministic(reinterpret_cast<uint8_t*>(tensor_b2), n1*h1*w1*c1*sizeof(int));
 
 
+    
+
+
+
     perf.CollectCounters();
     hadamard_tensor_4d_int(tensor_out2, Ar, tensor_b2, n1, h1, w1, c1);
     perf.CollectDelta();
-    results += "tensor_slicing_" + tensor_info + "," + "dtu," + perf.PrintCounters() + "," + print_checksum_i32(Ar, n1*h1*w1*c1) + "\n";
+    results += "tensor_slicing_" + tensor_info + "," + "0," + "dtu," + perf.PrintCounters() + "," + print_checksum_i32(Ar, n1*h1*w1*c1) + "\n";
 
     delete[] tensor_in;
     delete[] sliced_tensor; 
@@ -1685,10 +1690,13 @@ std::string benchmark::bench_wrapper_highdim_stencil(const BenchmarkData &bench_
     randomize_region_deterministic(reinterpret_cast<uint8_t*>(base_tensor), ny*nx*nz*sizeof(float));
 
 
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     perf.CollectCounters();
     highdim_7stencil_cpu(base_tensor, new_tensor, nx, ny, nz);
     perf.CollectDelta();
-    results += "highdim_7stencil_" + tensor_info + "," + "cpu," + perf.PrintCounters() + "," + std::to_string(print_checksum_float(new_tensor, ny*nx*nz)) + "\n";
+    results += "highdim_7stencil_" + tensor_info + "," + "cpu," + std::to_string(0) + ","  + perf.PrintCounters() + "," + std::to_string(print_checksum_float(new_tensor, ny*nx*nz)) + "\n";
 
 
 
@@ -1709,7 +1717,7 @@ std::string benchmark::bench_wrapper_highdim_stencil(const BenchmarkData &bench_
     highdim_7stencil_dtu(Ar, new_tensor2, nx, ny, nz);
     perf.CollectDelta();
     //printf("done\n");
-    results += "highdim_7stencil_" + tensor_info + "," + "dtu," + perf.PrintCounters() + "," + std::to_string(print_checksum_float(new_tensor2, ny*nx*nz)) + "\n";
+    results += "highdim_7stencil_" + tensor_info + "," + "dtu," + "0,"  + perf.PrintCounters() + "," + std::to_string(print_checksum_float(new_tensor2, ny*nx*nz)) + "\n";
     //printf("%s\n", results.c_str());
 
 
@@ -1787,6 +1795,12 @@ std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data
     randomize_region_deterministic(reinterpret_cast<uint8_t*>(filter), CUBE_SIZE*sizeof(int));
     randomize_region_deterministic(reinterpret_cast<uint8_t*>(in_tensor), d4*d3*d2*d1*sizeof(int));
 
+
+
+
+    uint64_t transform_cycles = 0;
+    uint64_t start;
+    uint64_t end;
     perf.CollectCounters();
     cube_stencil_8corner_cpu(in_tensor, out_tensor1, d4, d3, d2, d1, CUBE_DIM);
     // apply filter to cubes, write to result
@@ -1802,7 +1816,7 @@ std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data
         }
     }
     perf.CollectDelta();
-    results += "cubestencil_8corner_" + tensor_info + "," + "cpu," + perf.PrintCounters() + "," + print_checksum_i32(filter_tensor1, d4*ncubes*CUBE_SIZE) + "\n";
+    results += "cubestencil_8corner_" + tensor_info + "," + "cpu," + std::to_string(0) + ","  + perf.PrintCounters() + "," + print_checksum_i32(filter_tensor1, d4*ncubes*CUBE_SIZE) + "\n";
 
 
 
@@ -1836,7 +1850,7 @@ std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data
 
     perf.CollectDelta();
     //printf("done\n");
-    results += "cubestencil_8corner_" + tensor_info + "," + "dtu," + "," + print_checksum_i32(Ar, d4*ncubes*CUBE_SIZE) + "\n";
+    results += "cubestencil_8corner_" + tensor_info + "," + "dtu," + "0,"  + "," + print_checksum_i32(Ar, d4*ncubes*CUBE_SIZE) + "\n";
 
     delete[] in_tensor;
     delete[] filter_tensor1;

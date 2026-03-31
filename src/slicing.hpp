@@ -5,5 +5,18 @@
 
 void slice_tensor_int(int* out, int* in, int n1, int h1, int w1, int c1, int stride_n1, int stride_h1, int stride_w1, int stride_c1,\
     int stride_d1, int stride_d2, int stride_d3);
-
+void hadamard_inPlace_int(int *out,
+                      int *in,
+                      int *b,
+                      int n1,
+                      int h1,
+                      int w1,
+                      int c1,
+                      int stride_n1,
+                      int stride_h1,
+                      int stride_w1,
+                      int stride_c1,
+                      int stride_d1,
+                      int stride_d2,
+                      int stride_d3);
 #endif
