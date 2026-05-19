@@ -68,14 +68,24 @@ int main(int argc, char* argv[]) {
 
 
   //auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 8, 1, 2);
-	auto hwStat = new DTL::AGUHardwareStat({ // (nAdd, nMult, nSUb, nPassThru) 
+	//auto hwStat = new DTL::AGUHardwareStat({ // (nAdd, nMult, nSUb, nPassThru) 
+	//	{2,4,2,4},
+	//	{2,2,1,4},
+	//	{2,2,1,2},
+	//	{1,1,1,2},
+	//	{1,1,1,1},
+	//	{0,0,0,1},
+	//}, 5, 6, 5, 2, 1, 2);
+
+
+  auto hwStat = new DTL::AGUHardwareStat({ // (nAdd, nMult, nSUb, nPassThru) 
 		{2,4,2,4},
 		{2,2,1,4},
 		{2,2,1,2},
 		{1,1,1,2},
 		{1,1,1,1},
 		{0,0,0,1},
-	}, 5, 6, 5, 2, 1, 2);
+	}, 5, 6, 7, 2, 1, 2);
   hwStat->nMaxConfigs = 8;
   
 
@@ -89,16 +99,178 @@ int main(int argc, char* argv[]) {
   std::cout << "benchmark,type,transform_cost," << perf.PrintCountersLabel() << "hash" <<"\n";
 
 
+    std::string res = "";
+      for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::ImgAugmentationData_nchw)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        //std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+  res = "";
+
+
   //for (auto& bench : benchmark::BenchmarkDispatchDataSplitLayouts)
   //{
   //  std::cout << bench.benchmark(bench, api);
   //}
 
 
+
+    for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::im2colData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        //std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+  res = "";
+
+      for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::vol2colData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+  res = "";
+
+
+
+
+    for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::unfoldData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        //std::cout << bench_res << "\n";
+    }
+  }
+
+  std::cout << res << "\n";
+  res = "";
+
+
+
+      for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::colProjData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        //std::cout << bench_res << "\n";
+    }
+  }
+
+    std::cout << res << "\n";
+  res = "";
+  return 0;
+
+
+  for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::slicingData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        //std::cout << bench_res << "\n";
+    }
+  }
+  std::cout << res << "\n";
+  res = "";
+
+
+  for (int i = 0; i < 10; i++)
+  {
+      for (auto& bench: benchmark::colProjData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+  res = "";
+
+
+
+  return 0;
+
+
   int x = 1000;
 
-  std::string res = "";
 
+
+      for (int i = 0; i < 10; i++)
+  {
+      for (auto& bench: benchmark::unfoldData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        std::cout << bench_res << "\n";
+    }
+  }
+
+  std::cout << res << "\n";
+ // res = "";
+//
+ //   for (int i = 0; i < 10; i++)
+ // {
+ //     for (auto& bench: benchmark::vol2colData)
+ //   {
+ //       auto bench_res = bench.benchmark(bench, api);
+ //       res += bench_res;
+ //       std::cout << bench_res << "\n";
+ //   }
+ //   
+ // }
+ // std::cout << res << "\n";
+ // res = "";
+//
+  return 0;
+
+
+      for (int i = 0; i < 10; i++)
+  {
+      for (auto& bench: benchmark::colProjData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+  res = "";
+
+
+
+      for (int i = 0; i < 10; i++)
+  {
+      for (auto& bench: benchmark::colProjData2)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+  res = "";
 
 
     for (int i = 0; i < 10; i++)

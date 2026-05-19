@@ -251,8 +251,6 @@ void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
 */
 void matmult_conv_blocked(float* A, float* B, float* C, int M, int K, int N)
 {
-
-
     int i, j, k, ii, jj, kk;
     int bs = 64; // you can tune this
 
@@ -640,11 +638,13 @@ void matmul_opt5_recursive_pretranspose(TYPE* a, TYPE*  b, TYPE* c, size_t size,
 
 void hadamard(int *out, int *a, int *b, int height, int width)
 {
+  int x = 0;
     for (int h = 0; h < height; h++)
     {
         for (int w = 0; w < width; w++)
         {
-            out[h*width + w] = a[h*width + w] * b[h*width + w];
+            out[x] = a[x] * b[x];
+            x++;
         }
     }
 }

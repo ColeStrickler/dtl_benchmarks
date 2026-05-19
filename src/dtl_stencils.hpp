@@ -5,6 +5,30 @@
 
 
 static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
+
+    {"vol2col", \
+            R"(
+                for (int c = 0; c < [CHANNELS]; c++) {
+                    for (int kt = 0; kt < [KT]; kt++) {
+                        for (int kh = 0; kh < [KH]; kh++) {
+                            for (int kw = 0; kw < [KW]; kw++) {
+                                for (int t = 0; t < [CDEPTH]; t++) {
+                                    for (int h = 0; h < [CHEIGHT]; h++) {
+                                        for (int w = 0; w < [CWIDTH]; w++) {
+                                            out = (c*(depth*height*width) + w + kw)
+                                                    + ((t + kt)*(height*width)
+                                                    + (h + kh)*width);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            )"
+    },
+
+
     {"im2col", \
                 R"(
                 for (int c_im = 0; c_im < [CHANNELS]; c_im++) {
@@ -196,19 +220,19 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
     
     {"tensor_slicing", \
                         R"(
-                            for (int i = 0; i < [D4]; i++)
-                            {
-                                for (int j = 0; j < [D3]; j++)
-                                {
-                                    for (int k = 0; k < [D2]; k++)
-                                    {
-                                        for (int l = 0; l < [D1]; l++)
-                                        {
-                                            out = (l*(stride_c1) + j*(stride_d1*stride_w1)) + (k*(stride_h1*stride_d2) + i*(stride_n1*stride_d3));
-                                        }
-                                    }
-                                }
-                            }
+for (int i = 0; i < [D4]; i++)
+{
+    for (int j = 0; j < [D3]; j++)
+    {
+        for (int k = 0; k < [D2]; k++)
+        {
+            for (int l = 0; l < [D1]; l++)
+            {
+                out = (l*(stride_c1) + j*(stride_d1*stride_w1)) + (k*(stride_h1*stride_d2) + i*(stride_n1*stride_d3));
+            }
+        }
+    }
+}
                         )"
     },
 
@@ -382,6 +406,141 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
             }
         )"
     },
+
+    {"permute_reflect_nchw", \
+        R"(
+            for (int n = 0; n < [NMAX]; n++)
+            {
+                for (int c = 0; c < [CMAX]; c++)
+                {
+                    for (int h = 0; h < [HMAX]; h++)
+                    {
+                        for (int w = 0; w < [WMAX]; w++)
+                        {
+                            out = n*stride_n + c*stride_c + h*stride_h + (W-1-w);
+                        }
+                    }
+                }
+            }
+        )"
+    },
+
+    {"permute_rot_left_nchw", \
+        R"(
+            for (int n = 0; n < [NMAX]; n++)
+            {
+                for (int c = 0; c < [CMAX]; c++)
+                {
+                    for (int w = 0; w < [WMAX]; w++)
+                    {
+                        for (int h = 0; h < [HMAX]; h++)
+                        {
+                            out = n*stride_n + c*stride_c + h*stride_h + (W-1-w);
+                        }
+                    }
+                }
+            }
+        )"
+    },
+
+        
+    {"permute_rot_left_reflect_nchw", \
+        R"(
+            for (int n = 0; n < [NMAX]; n++)
+            {
+                for (int c = 0; c < [CMAX]; c++)
+                { 
+                    for (int w = 0; w < [WMAX]; w++)
+                    {
+                        for (int h = 0; h < [HMAX]; h++)
+                        {
+                            out = n*stride_n + c*stride_c + h*stride_h + w;
+                        }
+                    }
+                }
+            }
+        )"
+    },
+
+            
+    {"permute_flipy_nchw", \
+        R"(
+            for (int n = 0; n < [NMAX]; n++)
+            {
+                for (int c = 0; c < [CMAX]; c++)
+                { 
+                    for (int h = 0; h < [HMAX]; h++)
+                    {
+                        for (int w = 0; w < [WMAX]; w++)
+                        {
+                            out = n*stride_n + c*stride_c + (H-1-h)*stride_h + w;
+                        }
+                    }
+                }
+            }
+        )"
+    },
+
+    {"permute_flipy_reflect_nchw", \
+        R"(
+            for (int n = 0; n < [NMAX]; n++)
+            {
+                for (int c = 0; c < [CMAX]; c++)
+                { 
+                    for (int h = 0; h < [HMAX]; h++)
+                    {
+                        for (int w = 0; w < [WMAX]; w++)
+                        {
+                            out = n*stride_n + c*stride_c + (H-1-h)*stride_h + (W-1-w);
+                        }
+                    }
+                }
+            }
+        )"
+    },
+
+
+    {"permute_rot_right_nchw", \
+        R"(
+            for (int n = 0; n < [NMAX]; n++)
+            {
+                for (int c = 0; c < [CMAX]; c++)
+                {
+                    for (int w = 0; w < [WMAX]; w++)
+                    {
+                        for (int h = 0; h < [HMAX]; h++)
+                        {
+                            out = n*stride_n + c*stride_c + (H-1-h)*stride_h + w;
+                        }
+                    }
+                }
+            }
+        )"
+    },
+
+    {"permute_rot_right_reflect_nchw", \
+        R"(
+            for (int n = 0; n < [NMAX]; n++)
+            {
+                for (int c = 0; c < [CMAX]; c++)
+                {
+                    for (int w = 0; w < [WMAX]; w++)
+                    {
+                        for (int h = 0; h < [HMAX]; h++)
+                        {
+                            out = n*stride_n + c*stride_c + (H-1-h)*stride_h + (W-1-w);
+                        }
+                    }
+                }
+            }
+        )"
+    },
+
+
+
+
+
+
 
 };
 

@@ -32,6 +32,7 @@
 //#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 //#define INCLUDE_BOOM_PERF_EXTRA
 #define INCLUDE_INCLUSIVE_LLC_COUNTERS
+#define INCLUDE_DTU_PERF_COUNTERS
 //#define INCLUDE_BOOM_PERF_EXTRA
 /*
     Custom intra-core counters for the boom core
@@ -52,11 +53,33 @@
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
 #define LLC_PERF_BASE 0x2110000
-#define LLC_ACCESS_COUNT 0x608      // SET TO ACTUAL
-#define LLC_MISS_COUNT 0x600
+#define LLC_REFILL 0x610
+#define LLC_WB 0x618
+#define L1_REFILL 0x600
+#define L1_WB 0x608
+
+
+#define READ_LLC_REFILL(base)  (READ_UINT64(base + LLC_REFILL))
+#define READ_LLC_WB(base)  (READ_UINT64(base + LLC_WB))
+#define READ_L1_REFILL(base) (READ_UINT64(base + L1_REFILL))
+#define READ_L1_WB(base) (READ_UINT64(base + L1_WB))
+ 
 #define READ_LLC_ACCESS_COUNT(base) (READ_UINT64(base + LLC_ACCESS_COUNT))
 #define READ_LLC_MISS_COUNT(base) (READ_UINT64(base + LLC_MISS_COUNT))
 #endif
+
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+#define DTU_PERF_BASE 0x3000000ULL
+
+#define DTU_ACCESS 0xf00
+#define NON_DTU_ACCESS 0xf08
+
+
+#define READ_DTU_ACCESS(base) (READ_UINT64(base + DTU_ACCESS))
+#define READ_NONDTU_ACCESS(base) (READ_UINT64(base + NON_DTU_ACCESS))
+
+#endif
+
 
 
 struct RocketChipCounters
@@ -80,13 +103,18 @@ struct RocketChipCounters
 #endif
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    uint64_t m_LLCAccessCount;
-    uint64_t m_LLCMissCounter;
+    uint64_t m_L1Refill;
+    uint64_t m_L1Writeback;
+    uint64_t m_LLCRefill;
+    uint64_t m_LLCWriteback;
 #endif
 
+
+
+
 #ifdef INCLUDE_DTU_PERF_COUNTERS
-
-
+    uint64_t RegularDRAMAccess;
+    uint64_t DTUDramAccess;
 #endif
 };
 
@@ -144,6 +172,9 @@ private:
     uint64_t m_ControlRegionBase;
     RocketChipCounters m_Counters;
     int m_CacheMMIOFd;
+    int m_DTUMMIOFd;
+    uint64_t m_DTUControlRegionBase;
+    
 };
 
 #endif

@@ -12,9 +12,23 @@ PerfManager::PerfManager()
     }
 
     auto control_region_size = 0x1000;
-    printf("AGUControlRegionSize: 0x%x\n", control_region_size);
+    //printf("AGUControlRegionSize: 0x%x\n", control_region_size);
     m_ControlRegionBase = (uint64_t)mmap(NULL, control_region_size, PROT_READ | PROT_WRITE, MAP_SHARED, m_CacheMMIOFd, LLC_PERF_BASE);
 #endif
+
+
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+    m_DTUMMIOFd = open_fd();
+    if (m_DTUMMIOFd == -1)
+    {
+        printf("PerfManager::PerfManager() Could not open /dev/mem\n");
+        exit(-1);
+        return;
+    }
+    auto dtu_region_size = 0x1000;
+    m_DTUControlRegionBase = (uint64_t)mmap(NULL, dtu_region_size, PROT_READ | PROT_WRITE, MAP_SHARED, m_DTUMMIOFd, DTU_PERF_BASE);
+#endif
+
 }
 
 PerfManager::~PerfManager()
@@ -23,6 +37,12 @@ PerfManager::~PerfManager()
     close(m_CacheMMIOFd);
     munmap((void*)m_ControlRegionBase, 0x1000);
 #endif
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+    close(m_DTUMMIOFd);
+    munmap((void*)m_DTUControlRegionBase, 0x1000);
+    
+#endif
+
 }
 
 //#define INCLUDE_INCLUSIVE_LLC_COUNTERS
@@ -46,9 +66,17 @@ void PerfManager::ClearCounters()
 #endif
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    m_Counters.m_LLCAccessCount = 0;
-    m_Counters.m_LLCMissCounter = 0;
+    m_Counters.m_L1Refill = 0;
+    m_Counters.m_L1Writeback = 0;
+    m_Counters.m_LLCRefill = 0;
+    m_Counters.m_LLCWriteback = 0;
 #endif 
+
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+    m_Counters.RegularDRAMAccess = 0;
+    m_Counters.DTUDramAccess = 0;
+#endif
+
 }
 
 std::string PerfManager::PrintCountersLabel() {
@@ -71,9 +99,18 @@ std::string PerfManager::PrintCountersLabel() {
 
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    ret += "LLCAccessCount,";
-    ret += "LLCMissCount,";
+    ret += "LLCRefill,";
+    ret += "LLCWB,";
+    ret += "L1Refill,";
+    ret += "L1WB,";
 #endif 
+
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+    ret += "RegularDRAMAccess,";
+    ret += "DTUDramAccess,";
+#endif
+
+
     return ret;
 }
 
@@ -98,9 +135,18 @@ std::string PerfManager::PrintCounters()
 
 
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    ret += std::to_string(m_Counters.m_LLCAccessCount) + ",";
-    ret += std::to_string(m_Counters.m_LLCMissCounter) + "";
+    ret += std::to_string(m_Counters.m_LLCRefill) + ",";
+    ret += std::to_string(m_Counters.m_LLCWriteback) + ",";
+    ret += std::to_string(m_Counters.m_L1Refill) + ",";
+    ret += std::to_string(m_Counters.m_L1Writeback) + ",";
 #endif 
+
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+    ret += std::to_string(m_Counters.RegularDRAMAccess) + ",";
+    ret += std::to_string(m_Counters.DTUDramAccess) +  ",";
+#endif
+
+
     return ret;
 }
 
@@ -128,8 +174,16 @@ void PerfManager::CollectCounters() {
 
     // do MMIO reads last
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    m_Counters.m_LLCAccessCount = READ_LLC_ACCESS_COUNT(m_ControlRegionBase);
-    m_Counters.m_LLCMissCounter =  READ_LLC_MISS_COUNT(m_ControlRegionBase);
+    m_Counters.m_LLCRefill= READ_LLC_REFILL(m_ControlRegionBase);
+    m_Counters.m_LLCWriteback =  READ_LLC_WB(m_ControlRegionBase);
+    m_Counters.m_L1Refill= READ_L1_REFILL(m_ControlRegionBase);
+    m_Counters.m_L1Writeback =  READ_L1_WB(m_ControlRegionBase);
+#endif
+
+
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+    m_Counters.DTUDramAccess = READ_DTU_ACCESS(m_DTUControlRegionBase);
+    m_Counters.RegularDRAMAccess = READ_NONDTU_ACCESS(m_DTUControlRegionBase);
 #endif
    // printf("got counters\n");
 }
@@ -157,8 +211,15 @@ void PerfManager::CollectDelta()
 
         // do MMIO reads last
 #ifdef INCLUDE_INCLUSIVE_LLC_COUNTERS
-    m_Counters.m_LLCAccessCount = READ_LLC_ACCESS_COUNT(m_ControlRegionBase) - m_Counters.m_LLCAccessCount;
-    m_Counters.m_LLCMissCounter = READ_LLC_MISS_COUNT(m_ControlRegionBase) - m_Counters.m_LLCMissCounter;
+    m_Counters.m_LLCRefill =        READ_LLC_REFILL(m_ControlRegionBase) - m_Counters.m_LLCRefill;
+    m_Counters.m_LLCWriteback =     READ_LLC_WB(m_ControlRegionBase) - m_Counters.m_LLCWriteback;
+    m_Counters.m_L1Refill =          READ_L1_REFILL(m_ControlRegionBase) - m_Counters.m_L1Refill;
+    m_Counters.m_L1Writeback =      READ_L1_WB(m_ControlRegionBase) - m_Counters.m_L1Writeback;
+#endif
+
+#ifdef INCLUDE_DTU_PERF_COUNTERS
+    m_Counters.DTUDramAccess = READ_DTU_ACCESS(m_DTUControlRegionBase) - m_Counters.DTUDramAccess;
+    m_Counters.RegularDRAMAccess = READ_NONDTU_ACCESS(m_DTUControlRegionBase) - m_Counters.RegularDRAMAccess;
 #endif
 
 }

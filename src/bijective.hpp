@@ -51,6 +51,15 @@ Shape permute_reflect_x2D(float* in, float* out, Shape shape_in);
 Shape permute_reflect_y2D(float* in, float* out, Shape shape_in);
 Shape permute_reflect_y_reflect_x2D(float* in, float* out, Shape shape_in);
 
+Shape permute_rot_left2D_nchw(float* in, float* out, Shape shape_in);
+Shape permute_rot_right2D_nchw(float* in, float* out, Shape shape_in);
+Shape permute_reflectx_rot_left2D_nchw(float* in, float* out, Shape shape_in);
+Shape permute_reflectx_rot_right2D_nchw(float* in, float* out, Shape shape_in);
+Shape permute_reflect_x2D_nchw(float* in, float* out, Shape shape_in);
+Shape permute_reflect_y2D_nchw(float* in, float* out, Shape shape_in);
+Shape permute_reflect_y_reflect_x2D_nchw(float* in, float* out, Shape shape_in);
+
+
 Shape fuse_permute_rot_left2D(float* in, float* out, float* out2, Shape shape_in);
 Shape fuse_permute_rot_right2D(float* in, float* out,  float* out2, Shape shape_in);
 Shape fuse_permute_reflectx_rot_left2D(float* in, float* out,  float* out2, Shape shape_in);

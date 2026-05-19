@@ -22,11 +22,51 @@ void IntensityScaleBatch(float scalar, float *in, float* out, Shape shape_in)
 
 
 
+Shape permute_rot_left2D_nchw(float *in, float *out, Shape shape_in) {
+  //assert(shape_in.GetDimensionality() == 4);
+  // we take in a NCHW
+  // We need to translate from this to NCWH
+  /*
+      We can iterate the coordinates the same as in the DTU
+  */
+  Shape outshape = shape_in;
+  //outshape.nhwc_to_nchw();
+  outshape.Rotate2D();
+  shape_in.SetStrides();
+
+  std::vector<int> out_dim = outshape.GetDimensions();
+  std::vector<int> in_dim = shape_in.GetDimensions();
+  int n = out_dim[0];
+  int c = out_dim[1];
+  int w = out_dim[2];
+  int h = out_dim[3];
+
+  //assert(n == in_dim[0]);
+  //assert(h == in_dim[1]);
+  //assert(w == in_dim[2]);
+  //assert(c == in_dim[3]);
+
+  // With rotate left, out(y, x) = in(x, Y - 1 - y)
+  int W = w;
+  int H = h;
+  int i = 0;
+  for (int nx = 0; nx < n; nx++) {
+    for (int cx = 0; cx < c; cx++) {
+      for (int wx = 0; wx < w; wx++) {
+        for (int hx = 0; hx < h; hx++) {
+          out[i++] = in[shape_in.LinearIndex({nx, cx, hx, W - 1 - wx})]; //  is inlined
+        }
+      }
+    }
+  }
+
+  return outshape;
+}
 
 
 
 Shape permute_rot_left2D(float *in, float *out, Shape shape_in) {
-  assert(shape_in.GetDimensionality() == 4);
+  //assert(shape_in.GetDimensionality() == 4);
   // we take in a NHWC
   // We need to translate from this to NCWH
   /*
@@ -44,10 +84,10 @@ Shape permute_rot_left2D(float *in, float *out, Shape shape_in) {
   int w = out_dim[2];
   int h = out_dim[3];
 
-  assert(n == in_dim[0]);
-  assert(h == in_dim[1]);
-  assert(w == in_dim[2]);
-  assert(c == in_dim[3]);
+  //assert(n == in_dim[0]);
+  //assert(h == in_dim[1]);
+  //assert(w == in_dim[2]);
+  //assert(c == in_dim[3]);
 
   // With rotate left, out(y, x) = in(x, Y - 1 - y)
   int W = w;
@@ -72,7 +112,7 @@ Shape fuse_permute_rot_left2D(float *in,
                               float *out2,
                               Shape shape_in)
 {
-  assert(shape_in.GetDimensionality() == 4);
+  //assert(shape_in.GetDimensionality() == 4);
   // we take in a NHWC
   // We need to translate from this to NCWH
   /*
@@ -90,10 +130,10 @@ Shape fuse_permute_rot_left2D(float *in,
   int w = out_dim[2];
   int h = out_dim[3];
 
-  assert(n == in_dim[0]);
-  assert(h == in_dim[1]);
-  assert(w == in_dim[2]);
-  assert(c == in_dim[3]);
+  //assert(n == in_dim[0]);
+  //assert(h == in_dim[1]);
+  //assert(w == in_dim[2]);
+  //assert(c == in_dim[3]);
 
   // With rotate left, out(y, x) = in(x, Y - 1 - y)
   int W = w;
@@ -119,7 +159,7 @@ Shape fuse_permute_rot_right2D(float *in,
                                float *out,
                                float *out2,
                                Shape shape_in) {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -137,10 +177,10 @@ Shape fuse_permute_rot_right2D(float *in,
     int h = out_dim[3];
 
 
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
 
     // With rotate right, out(y, x) = in(H - 1 - x, y)
     int W = w;
@@ -166,10 +206,55 @@ Shape fuse_permute_rot_right2D(float *in,
 }
 
 
+Shape permute_rot_right2D_nchw(float *in, float *out, Shape shape_in)
+{
+    //assert(shape_in.GetDimensionality() == 4);
+    // we take in a NHWC
+    // We need to translate from this to NCWH
+    /*
+        We can iterate the coordinates the same as in the DTU
+    */
+    Shape outshape = shape_in;
+    //outshape.nhwc_to_nchw();
+    outshape.Rotate2D();
+    shape_in.SetStrides();
+    std::vector<int> out_dim = outshape.GetDimensions();
+    std::vector<int> in_dim = shape_in.GetDimensions();
+    int n = out_dim[0];
+    int c = out_dim[1];
+    int w = out_dim[2];
+    int h = out_dim[3];
+
+
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
+
+    // With rotate right, out(y, x) = in(H - 1 - x, y)
+    int W = w;
+    int H = h;
+    int i = 0;
+    for (int nx = 0; nx < n; nx++)
+    {
+        for (int cx = 0; cx < c; cx++)
+        {
+            for (int wx = 0; wx < w; wx++)
+            {
+                for (int hx = 0; hx < h; hx++)
+                {
+                    out[i++] = in[shape_in.LinearIndex({nx, cx, H-1-hx, wx})]; //  is inlined
+                }
+            }
+        }
+    }
+
+    return outshape;
+}
 
 Shape permute_rot_right2D(float *in, float *out, Shape shape_in)
 {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -187,10 +272,10 @@ Shape permute_rot_right2D(float *in, float *out, Shape shape_in)
     int h = out_dim[3];
 
 
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
 
     // With rotate right, out(y, x) = in(H - 1 - x, y)
     int W = w;
@@ -216,7 +301,7 @@ Shape fuse_permute_reflectx_rot_left2D(float *in,
                                        float *out,
                                        float *out2,
                                        Shape shape_in) {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -235,10 +320,10 @@ Shape fuse_permute_reflectx_rot_left2D(float *in,
     int h = out_dim[3];
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
     // REFLECT: (h1,w1) = (h1, W-1-w1)
@@ -265,8 +350,52 @@ Shape fuse_permute_reflectx_rot_left2D(float *in,
     return outshape;
 }
 
+
+Shape permute_reflectx_rot_left2D_nchw(float *in, float *out, Shape shape_in) {
+  //assert(shape_in.GetDimensionality() == 4);
+  // we take in a NHWC
+  // We need to translate from this to NCWH
+  /*
+      We can iterate the coordinates the same as in the DTU
+  */
+  Shape outshape = shape_in;
+  //outshape.nhwc_to_nchw();
+  outshape.Rotate2D();
+  shape_in.SetStrides();
+
+  std::vector<int> out_dim = outshape.GetDimensions();
+  std::vector<int> in_dim = shape_in.GetDimensions();
+  int n = out_dim[0];
+  int c = out_dim[1];
+  int w = out_dim[2];
+  int h = out_dim[3];
+
+  //assert(n == in_dim[0]);
+  //assert(h == in_dim[1]);
+  //assert(w == in_dim[2]);
+  //assert(c == in_dim[3]);
+
+  // REFLECT: (h1,w1) = (h1, W-1-w1)
+  // ROTLEFT: # i,j --> [j, H - 1 - i] --> (h, W-1-(W-1-w1))
+  int W = w;
+  int H = h;
+  int i = 0;
+  for (int nx = 0; nx < n; nx++) {
+    for (int cx = 0; cx < c; cx++) {
+      for (int wx = 0; wx < w; wx++) {
+        for (int hx = 0; hx < h; hx++) {
+          out[i++] = in[shape_in.LinearIndex({nx, cx, hx, wx})];  //  is inlined
+        }
+      }
+    }
+  }
+
+  return outshape;
+}
+
+
 Shape permute_reflectx_rot_left2D(float *in, float *out, Shape shape_in) {
-  assert(shape_in.GetDimensionality() == 4);
+  //assert(shape_in.GetDimensionality() == 4);
   // we take in a NHWC
   // We need to translate from this to NCWH
   /*
@@ -284,10 +413,10 @@ Shape permute_reflectx_rot_left2D(float *in, float *out, Shape shape_in) {
   int w = out_dim[2];
   int h = out_dim[3];
 
-  assert(n == in_dim[0]);
-  assert(h == in_dim[1]);
-  assert(w == in_dim[2]);
-  assert(c == in_dim[3]);
+  //assert(n == in_dim[0]);
+  //assert(h == in_dim[1]);
+  //assert(w == in_dim[2]);
+  //assert(c == in_dim[3]);
 
   // REFLECT: (h1,w1) = (h1, W-1-w1)
   // ROTLEFT: # i,j --> [j, H - 1 - i] --> (h, W-1-(W-1-w1))
@@ -311,7 +440,7 @@ Shape fuse_permute_reflectx_rot_right2D(float *in,
                                         float *out,
                                         float *out2,
                                         Shape shape_in) {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -330,10 +459,10 @@ Shape fuse_permute_reflectx_rot_right2D(float *in,
     int h = out_dim[3];
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
     // REFLECT: (h1,w1) = (h1, W-1-w1)
@@ -361,9 +490,58 @@ Shape fuse_permute_reflectx_rot_right2D(float *in,
 }
 
 
+Shape permute_reflectx_rot_right2D_nchw(float *in, float *out, Shape shape_in)
+{
+    //assert(shape_in.GetDimensionality() == 4);
+    // we take in a NHWC
+    // We need to translate from this to NCWH
+    /*
+        We can iterate the coordinates the same as in the DTU
+    */
+    Shape outshape = shape_in;
+    //outshape.nhwc_to_nchw();
+    outshape.Rotate2D();
+    shape_in.SetStrides();
+
+    std::vector<int> out_dim = outshape.GetDimensions();
+    std::vector<int> in_dim = shape_in.GetDimensions();
+    int n = out_dim[0];
+    int c = out_dim[1];
+    int w = out_dim[2];
+    int h = out_dim[3];
+
+    
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
+    
+
+    // REFLECT: (h1,w1) = (h1, W-1-w1)
+    // ROTRIGHT: # i,j --> (i,j) -->  [W - 1 - j, i]  --> (H-1-h, W-1-w)
+    int W = w;
+    int H = h;
+    int i = 0;
+    for (int nx = 0; nx < n; nx++)
+    {
+        for (int cx = 0; cx < c; cx++)
+        {
+            for (int wx = 0; wx < w; wx++)
+            {
+                for (int hx = 0; hx < h; hx++)
+                {
+                    out[i++] = in[shape_in.LinearIndex({nx, cx, H-1-hx, W-1-wx})]; //  is inlined
+                } 
+            }
+        }
+    }
+
+    return outshape;
+}
+
 Shape permute_reflectx_rot_right2D(float *in, float *out, Shape shape_in)
 {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -382,10 +560,10 @@ Shape permute_reflectx_rot_right2D(float *in, float *out, Shape shape_in)
     int h = out_dim[3];
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
     // REFLECT: (h1,w1) = (h1, W-1-w1)
@@ -416,7 +594,7 @@ Shape fuse_permute_reflect_x2D(float *in,
                                float *out,
                                float *out2,
                                Shape shape_in) {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -436,10 +614,10 @@ Shape fuse_permute_reflect_x2D(float *in,
 
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
 
@@ -466,10 +644,58 @@ Shape fuse_permute_reflect_x2D(float *in,
 }
 
 
+Shape permute_reflect_x2D_nchw(float *in, float *out, Shape shape_in) 
+{
+    //assert(shape_in.GetDimensionality() == 4);
+    // we take in a NHWC
+    // We need to translate from this to NCWH
+    /*
+        We can iterate the coordinates the same as in the DTU
+    */
+    Shape outshape = shape_in;
+   // outshape.nhwc_to_nchw();
+    shape_in.SetStrides();
+    shape_in.SetStrides();
+
+    std::vector<int> out_dim = outshape.GetDimensions();
+    std::vector<int> in_dim = shape_in.GetDimensions();
+    int n = out_dim[0];
+    int c = out_dim[1];
+    int h = out_dim[2];
+    int w = out_dim[3];
+
+
+    
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
+    
+
+
+    int W = w;
+    int H = h;
+    int i = 0;
+    for (int nx = 0; nx < n; nx++)
+    {
+        for (int cx = 0; cx < c; cx++)
+        {
+            for (int hx = 0; hx < h; hx++)
+            {
+                for (int wx = 0; wx < w; wx++)
+                {
+                    out[i++] = in[shape_in.LinearIndex({nx, cx, hx, W-1-wx})]; //  is inlined
+                } 
+            }
+        }
+    }
+
+    return outshape;
+}
 
 Shape permute_reflect_x2D(float *in, float *out, Shape shape_in) 
 {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -489,10 +715,10 @@ Shape permute_reflect_x2D(float *in, float *out, Shape shape_in)
 
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
 
@@ -522,7 +748,7 @@ Shape fuse_permute_reflect_y2D(float *in,
                                float *out,
                                float *out2,
                                Shape shape_in) {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -541,10 +767,10 @@ Shape fuse_permute_reflect_y2D(float *in,
 
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
     int W = w;
@@ -571,9 +797,56 @@ Shape fuse_permute_reflect_y2D(float *in,
 
 
 
+Shape permute_reflect_y2D_nchw(float *in, float *out, Shape shape_in) 
+{
+    //assert(shape_in.GetDimensionality() == 4);
+    // we take in a NHWC
+    // We need to translate from this to NCWH
+    /*
+        We can iterate the coordinates the same as in the DTU
+    */
+    Shape outshape = shape_in;
+    //outshape.nhwc_to_nchw();
+    shape_in.SetStrides();
+
+    std::vector<int> out_dim = outshape.GetDimensions();
+    std::vector<int> in_dim = shape_in.GetDimensions();
+    int n = out_dim[0];
+    int c = out_dim[1];
+    int h = out_dim[2];
+    int w = out_dim[3];
+
+
+    
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
+    
+
+    int W = w;
+    int H = h;
+    int i = 0;
+    for (int nx = 0; nx < n; nx++)
+    {
+        for (int cx = 0; cx < c; cx++)
+        {
+            for (int hx = 0; hx < h; hx++)
+            {
+                for (int wx = 0; wx < w; wx++)
+                {
+                    out[i++] = in[shape_in.LinearIndex({nx, cx, H-1-hx, wx})]; //  is inlined
+                } 
+            }
+        }
+    }
+
+    return outshape;
+}
+
 Shape permute_reflect_y2D(float *in, float *out, Shape shape_in) 
 {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -592,10 +865,10 @@ Shape permute_reflect_y2D(float *in, float *out, Shape shape_in)
 
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
     int W = w;
@@ -624,7 +897,7 @@ Shape fuse_permute_reflect_y_reflect_x2D(float *in,
                                          float *out,
                                          float *out2,
                                          Shape shape_in) {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -644,10 +917,10 @@ Shape fuse_permute_reflect_y_reflect_x2D(float *in,
 
 
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
     int W = w;
@@ -672,9 +945,62 @@ Shape fuse_permute_reflect_y_reflect_x2D(float *in,
     return outshape;
 }
 
+
+Shape permute_reflect_y_reflect_x2D_nchw(float *in, float *out, Shape shape_in) 
+{
+    //assert(shape_in.GetDimensionality() == 4);
+    // we take in a NHWC
+    // We need to translate from this to NCWH
+    /*
+        We can iterate the coordinates the same as in the DTU
+    */
+    Shape outshape = shape_in;
+    //outshape.nhwc_to_nchw();
+    shape_in.SetStrides();
+
+
+    std::vector<int> out_dim = outshape.GetDimensions();
+    std::vector<int> in_dim = shape_in.GetDimensions();
+    int n = out_dim[0];
+    int c = out_dim[1];
+    int h = out_dim[2];
+    int w = out_dim[3];
+
+    auto strides = shape_in.GetStrides();
+    
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
+    
+
+    int W = w;
+    int H = h;
+    int i = 0;
+
+
+
+
+    for (int nx = 0; nx < n; nx++)
+    {
+        for (int cx = 0; cx < c; cx++)
+        {
+            for (int hx = 0; hx < h; hx++)
+            {
+                for (int wx = 0; wx < w; wx++)
+                {
+                    out[i++] = in[shape_in.LinearIndex({nx, cx, H-1-hx, W-1-wx})]; //  is inlined
+                } 
+            }
+        }
+    }
+
+    return outshape;
+}
+
 Shape permute_reflect_y_reflect_x2D(float *in, float *out, Shape shape_in) 
 {
-    assert(shape_in.GetDimensionality() == 4);
+    //assert(shape_in.GetDimensionality() == 4);
     // we take in a NHWC
     // We need to translate from this to NCWH
     /*
@@ -694,10 +1020,10 @@ Shape permute_reflect_y_reflect_x2D(float *in, float *out, Shape shape_in)
 
     auto strides = shape_in.GetStrides();
     
-    assert(n == in_dim[0]);
-    assert(h == in_dim[1]);
-    assert(w == in_dim[2]);
-    assert(c == in_dim[3]);
+    //assert(n == in_dim[0]);
+    //assert(h == in_dim[1]);
+    //assert(w == in_dim[2]);
+    //assert(c == in_dim[3]);
     
 
     int W = w;
@@ -756,7 +1082,7 @@ void Shape::SetStrides()
 
 void Shape::Rotate2D() {
   int size = m_Dim.size();
-  assert(size >= 2);
+  //assert(size >= 2);
   auto d1 = m_Dim[size - 1];
   m_Dim[size - 1] = m_Dim[size - 2];
   m_Dim[size - 2] = d1;
@@ -773,7 +1099,7 @@ void Shape::Rotate2D() {
 void Shape::Rotate3D_Front() 
 {
     int size = m_Dim.size();
-    assert(size >= 3);
+    //assert(size >= 3);
     auto d2 = m_Dim[size-2];
     auto d3 = m_Dim[size-3];
     m_Dim[size-2] = d3;
@@ -792,7 +1118,7 @@ void Shape::Rotate3D_Front()
 void Shape::Rotate3D_Side()
 {
     int size = m_Dim.size();
-    assert(size >= 3);
+    //assert(size >= 3);
     auto d1 = m_Dim[size-1];
     auto d3 = m_Dim[size-3];
     m_Dim[size-1] = d3;
@@ -802,7 +1128,7 @@ void Shape::Rotate3D_Side()
 void Shape::nhwc_to_nchw()
 {
     int size = m_Dim.size();
-    assert(size >= 4);
+    //assert(size >= 4);
     auto c = m_Dim[size-1];
     auto w = m_Dim[size-2];
     auto h = m_Dim[size-3];
