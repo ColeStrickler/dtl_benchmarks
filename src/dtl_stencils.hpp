@@ -538,8 +538,54 @@ for (int i = 0; i < [D4]; i++)
 
 
 
+    {"sparse_matrix_vector", \
+        R"(
+            metadata_stream<4, 0x178000000, nnz> x;
+            for (int nnz = 0; nnz < [NNZ]; nnz++)
+            {
+                out = x; 
+            }
+        )"
+    },
 
 
+    {"attention_k", \
+    
+        R"(
+            metadata_stream<4, 0x178000000, nnz> x;
+            for (int nnz = 0; nnz < [NNZ]; nnz++)
+            {
+                for (int d = 0; d < [D]; d++)
+                {
+                    out = x*[D2] + d; 
+                }
+            }
+        )"
+    },
+
+
+    {"attention_v", \
+        R"(
+            metadata_stream<4, 0x178000000, nnz> x;
+
+            for (int nnz = 0; nnz < [NNZ]; nnz++)
+            {
+                for (int d = 0; d < [DV]; d++)
+                {
+                    out = x*[DV2] + d; 
+                }
+            }
+        )"
+    },
+
+    {"dummy", \
+        R"(
+            for (int i = 0; i < 100000000; i++)
+            {
+                out = i;
+            }
+        )"
+    },
 
 
 };

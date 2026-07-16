@@ -19,6 +19,21 @@ std::string benchmark::InsertDTLConfigParameters(const BenchmarkData& benchmark_
     return dtl_parameterized_config;
 }
 
+
+static std::string replaceKeyword(std::string str, std::string key, int replacement)
+{
+    auto dtl_parameterized_config = str;
+
+    std::string token = "[" + key + "]";
+    size_t pos;
+    while ((pos = dtl_parameterized_config.find(token)) != std::string::npos)
+        dtl_parameterized_config.replace(pos, token.size(), std::to_string(replacement));
+    
+    return dtl_parameterized_config;
+}
+
+
+
 std::string benchmark::CreateConstants(const std::unordered_map<std::string, BenchParam> &constants) {
     std::string ret;
 
@@ -994,6 +1009,399 @@ std::string benchmark::bench_wrapper_imageAugmentation_fuse(const BenchmarkData 
     return results;
 }
 
+
+std::string benchmark::bench_wrapper_SpMV(const BenchmarkData &bench_data, DTL::API *api) {
+    std::string results;
+    PerfManager perf;
+
+
+
+    //assert(bench_data.params.find("NNZ") != bench_data.params.end());
+    assert(bench_data.constants.find("rows") != bench_data.constants.end());
+    assert(bench_data.constants.find("cols") != bench_data.constants.end());
+
+    assert(bench_data.other.find("MAX_NNZ") != bench_data.other.end());
+    assert(bench_data.other.find("MIN_NNZ") != bench_data.other.end());
+
+
+    int max_nnz = bench_data.other.at("MAX_NNZ");
+    int min_nnz = bench_data.other.at("MIN_NNZ");
+    int nrows = bench_data.constants.at("rows")[0];
+    int ncols = bench_data.constants.at("cols")[0];
+    
+
+
+    float *x = new float[ncols]; // x is the vector
+    int *row_ptr = new int [(nrows + 1)];
+    int *col_idx = new int[max_nnz*nrows];
+    float *values = new float[max_nnz*nrows];
+    float* y = new float[nrows];
+    float* y2 = new float[nrows];
+
+    int nnz = generate_csr_random_rows(
+        nrows,
+        ncols,
+        min_nnz,
+        max_nnz,
+        row_ptr,
+        col_idx,
+        values,
+        1234
+    );
+
+    generate_vector(ncols, x, 1234);
+
+    auto new_bench_data = bench_data;
+    new_bench_data.params.insert({"NNZ", (uint32_t)nnz});
+
+    std::string conf = CreateBenchmarkConfig(new_bench_data);
+    std::string mat_info = std::to_string(new_bench_data.params.at("NNZ")) +
+                         "_" +
+                         std::to_string(new_bench_data.constants.at("rows")[0]) +
+                         "_" + std::to_string(new_bench_data.constants.at("cols")[0]);
+
+    std::cout << conf << std::endl;
+
+    perf.CollectCounters();
+    spmv_csr(nrows, row_ptr, col_idx, values, x, y);
+    perf.CollectDelta();
+    results +=
+      "spmv_" + mat_info + "," + "cpu," + std::to_string(0) + ","  + perf.PrintCounters() + "," +
+      std::to_string(print_checksum_float(y, nrows)) +
+      "\n";
+
+
+    
+
+
+
+    perf.ClearCounters();
+
+        
+    DTL::EphemeralRegion *ephemeral = api->AllocEphemeralRegion(std::max(nrows*max_nnz, ncols)*sizeof(float));
+    assert(ephemeral != nullptr);
+
+     if (!api->Compile(conf)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(ephemeral);
+        printf("Programmed hardware\n");
+
+    float *Aw = (float *)ephemeral->GetHeadlessWriteregion();
+    float *Ar = (float *)ephemeral->GetHeadlessReadRegion();
+
+
+    printf("HERE before COPY\n");
+
+    void* metadata_stream = map_devmem(0x188000000ULL, nrows*max_nnz*sizeof(float));
+    memcpy(Aw, x, ncols*sizeof(float)); // copy over vector
+    memcpy(metadata_stream, col_idx, nrows*max_nnz*sizeof(int));
+
+    printf("HERE COPIED\n");
+
+    perf.CollectCounters();
+    spmv_dtu(nrows, row_ptr, values, Ar, y2);
+    perf.CollectDelta();
+    printf("done spmv dtu\n");
+    fflush(stdout);
+
+    for (int row = 0; row < nrows; row++) {
+        for (int k = row_ptr[row];
+             k < row_ptr[row + 1];
+             k++) {
+            if (x[col_idx[k]] != Ar[k])
+                printf("%d --> %.3f != %.3f\n", k, x[col_idx[k]], Ar[k]);
+        }
+        //y[row] = sum;
+    }
+
+
+
+
+    results +=
+      "spmv_" + mat_info + "," + "dtu," + std::to_string(0) + ","  + perf.PrintCounters() + "," +
+      std::to_string(print_checksum_float(y2, nrows)) +
+      "\n";
+
+
+
+    if (munmap(metadata_stream, nrows*max_nnz*sizeof(float)) == -1) {
+        perror("munmap");
+    }
+
+    delete[] x;
+    delete[] row_ptr;
+    delete[] col_idx;
+    delete[] values;
+    delete[] y;
+    delete[] y2;
+    api->FreeEphemeralRegion(ephemeral);
+
+
+    return results;
+}
+
+std::string benchmark::bench_wrapper_sparseAttention(const BenchmarkData &bench_data,
+                                         DTL::API *api) {
+  std::string results;
+  PerfManager perf;
+
+
+
+    assert(bench_data.constants.count("M") > 0);
+    assert(bench_data.constants.count("N") > 0);
+    assert(bench_data.constants.count("D") > 0);
+    assert(bench_data.constants.count("DV") > 0);
+    assert(bench_data.constants.count("nnz_per_row") > 0);
+    const auto M = bench_data.constants.at("M")[0];
+    const auto N = bench_data.constants.at("N")[0];
+    const auto D = bench_data.constants.at("D")[0];
+    const auto DV = bench_data.constants.at("DV")[0];
+    const auto nnz_per_row =
+        bench_data.constants.at("nnz_per_row")[0];
+        std::string attention_info = std::to_string(bench_data.constants.at("M")[0]) +
+                         "_" +
+                         std::to_string(bench_data.constants.at("N")[0]) +
+                         "_" + std::to_string(bench_data.constants.at("D")[0])+
+                         "_" + std::to_string(bench_data.constants.at("DV")[0])+
+                         "_" + std::to_string(bench_data.constants.at("nnz_per_row")[0]);
+
+
+
+    auto buffers = generate_sparse_attention_buffers(M, N, D, DV, nnz_per_row, false, 1234);
+    auto buffers2 = generate_sparse_attention_buffers(M, N, D, DV, nnz_per_row, false, 1234);
+
+
+    perf.CollectCounters();
+    sparse_attention(M, D, DV, buffers.Q, buffers.K, buffers.V, buffers.row_ptr, buffers.col_idx, buffers.scores, buffers.O);
+    perf.CollectDelta();
+    results +=
+      "sparseAttention_" + attention_info + "," + "cpu," + std::to_string(0) + ","  + perf.PrintCounters() + "," +
+      std::to_string(print_checksum_float(buffers.O, M*DV)) +
+      "\n";
+    
+    perf.ClearCounters();
+
+
+    const std::size_t nnz = static_cast<std::size_t>(buffers.nnz);
+    const std::size_t K_dtu_elements = nnz * static_cast<std::size_t>(D);
+    const std::size_t V_dtu_elements = nnz * static_cast<std::size_t>(DV);
+    const std::size_t K_dtu_bytes = K_dtu_elements * sizeof(float);
+    const std::size_t V_dtu_bytes = V_dtu_elements * sizeof(float);
+        const std::size_t colidx_bytes =
+        nnz * sizeof(int);
+
+    const std::size_t K_bytes =
+        static_cast<std::size_t>(N) *
+        static_cast<std::size_t>(D) *
+        sizeof(float);
+
+    const std::size_t V_bytes =
+        static_cast<std::size_t>(N) *
+        static_cast<std::size_t>(DV) *
+        sizeof(float);
+
+    const std::size_t k_region_bytes = std::max(K_bytes, K_dtu_bytes);
+    const std::size_t v_region_bytes = std::max(V_bytes, V_dtu_bytes);
+
+    printf("K_bytes       = 0x%zx\n", K_bytes);
+    printf("K_dtu_bytes   = 0x%zx\n", K_dtu_bytes);
+    printf("k_region_bytes= 0x%zx\n", k_region_bytes);
+
+    printf("V_bytes       = 0x%zx\n", V_bytes);
+    printf("V_dtu_bytes   = 0x%zx\n", V_dtu_bytes);
+    printf("v_region_bytes= 0x%zx\n", v_region_bytes);
+
+
+
+
+
+    DTL::EphemeralRegion*  k_region = api->AllocEphemeralRegion(k_region_bytes);
+    DTL::EphemeralRegion*  v_region = api->AllocEphemeralRegion(v_region_bytes);
+
+    std::string k_config = dtl_stencil_configs["attention_k"];
+    std::string v_config = dtl_stencil_configs["attention_v"];
+
+
+    auto k_kernel = replaceKeyword(k_config, "NNZ", nnz);
+    k_kernel = replaceKeyword(k_kernel, "D", D);
+    k_kernel = replaceKeyword(k_kernel, "D2", D);
+
+    auto v_kernel = replaceKeyword(v_config, "NNZ", nnz);
+    v_kernel = replaceKeyword(v_kernel, "DV", DV);
+    v_kernel = replaceKeyword(v_kernel, "DV2", DV);
+
+
+
+    if (!api->Compile(k_kernel)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(k_region);
+    printf("Programmed k_region\n");
+
+    
+    if (!api->Compile(v_kernel)) {
+        printf("Failed to compile dtl program or map onto agu\n");
+        return "Failed to compile dtl program or map onto agu\n";
+    }
+    api->ProgramHardware(v_region);
+    printf("Programmed v_region\n");
+    
+
+
+    void* colidx_metadata_stream = map_devmem(0x188000000ULL, colidx_bytes);
+
+    float *Kw = (float *)k_region->GetHeadlessWriteregion();
+    float *K_dtu = (float *)k_region->GetHeadlessReadRegion();
+    float *Vw = (float *)v_region->GetHeadlessWriteregion();
+    float *V_dtu = (float *)v_region->GetHeadlessReadRegion();
+        printf("K_dtu=%p K_dtu_end=%p\n",
+        (void*)K_dtu,
+        (void*)((char*)K_dtu + K_dtu_bytes));
+
+    printf("V_dtu=%p V_dtu_end=%p\n",
+        (void*)V_dtu,
+        (void*)((char*)V_dtu + V_dtu_bytes));
+
+
+
+        /*
+    * Copy CSR column metadata.
+    */
+    std::memcpy(
+        colidx_metadata_stream,
+        buffers2.col_idx,
+        colidx_bytes);
+
+    /*
+    * Copy the complete dense K and V arrays into the DTU source regions.
+    */
+    std::memcpy(
+        Kw,
+        buffers2.K,
+        K_bytes);
+
+    std::memcpy(
+        Vw,
+        buffers2.V,
+        V_bytes);
+
+    printf("setup done. starting DTU\n");
+
+
+
+
+    //for (int i = 0; i < M; ++i) {
+    //    const float* q = buffers2.Q + i * D;
+//
+    //    for (int p = buffers2.row_ptr[i]; p < buffers2.row_ptr[i + 1]; ++p) {
+    //        const int j = buffers2.col_idx[p];
+    //        const float* k = buffers2.K + j * D;
+//
+    //        float dot = 0.0f;
+    //        for (int d = 0; d < D; ++d)
+    //        {
+    //            if (K_dtu[p*D + d] != k[d])
+    //            {
+    //                printf("K not equal (%d,%d,%d) != %.3f vs. %.3f\n",i,p,d,  K_dtu[p*D + d], k[d]);
+    //            }
+    //        }
+//
+    //    }
+    //}
+    //for (int i = 0; i < M; ++i) {
+    //    float* output_row = buffers2.O + i * DV;
+//
+    //    for (int p = buffers2.row_ptr[i]; p < buffers2.row_ptr[i + 1]; ++p) {
+    //        const float weight = buffers2.scores[p];
+    //        const float* value_row = buffers2.V + buffers2.col_idx[p] * DV;
+    //      //  const float* value_row2 = buffers2.K + buffers2.col_idx[p] * D;
+    //        
+    //        for (int d = 0; d < DV; ++d)
+    //        {
+    //            if (V_dtu[p*DV + d] != value_row[d])
+    //                printf("V not equal (%d,%d,%d) != %.3f vs. %.3f\n", i,p,d, V_dtu[p*DV + d], value_row[d]);
+    //        }
+    //    }
+    //}
+
+
+
+    perf.CollectCounters();
+    sparse_attention_dtu(M, D, DV, buffers2.Q, K_dtu,  buffers2.row_ptr, V_dtu, buffers2.scores, buffers2.O);
+    perf.CollectDelta();
+    results +=
+      "sparseAttention_" + attention_info + "," + "dtu," + std::to_string(0) + ","  + perf.PrintCounters() + "," +
+      std::to_string(print_checksum_float(buffers.O, M*DV)) +
+      "\n";
+    
+                                       
+    if (munmap(colidx_metadata_stream, colidx_bytes) == -1) {
+        perror("munmap");
+    }
+
+    free_sparse_attention_buffers(&buffers);
+    free_sparse_attention_buffers(&buffers2);
+
+    api->FreeEphemeralRegion(k_region);
+    api->FreeEphemeralRegion(v_region);
+
+  return results;
+}
+
+std::string benchmark::bench_ShadowPA_overhead(const BenchmarkData &bench_data,
+                                               DTL::API *api) {
+    std::string results;
+    PerfManager perf;
+
+
+    auto region = api->AllocEphemeralRegion(1000000*sizeof(int));
+    if(!api->Compile(dtl_stencil_configs["dummy"]))
+    {
+        printf("ERROR compile\n");
+        exit(-1);
+    }
+    api->ProgramHardware(region);
+
+
+    int count = 0;
+    volatile int* read = (int*)region->GetHeadlessReadRegion();
+
+    perf.CollectCounters(); //rdcycle
+    for (int j = 0; j < 10; j++)
+    {
+        for (int i = 0; i < 1000000; i++)
+        {
+            count += read[i];
+        }
+    }
+    perf.CollectDelta(); //rdcycle
+    results += "base," + perf.PrintCounters() + "\n";
+
+
+    perf.ClearCounters();
+    perf.CollectCounters();
+    for (int j = 0; j < 10; j++)
+    {
+        for (int i = 0; i < 1000000; i++)
+        {
+            count += read[i];
+        }
+        region->Sync();
+        read = (int*)region->GetHeadlessReadRegion();
+    }
+
+    perf.CollectDelta();
+    results += "overhead," + perf.PrintCounters() + "\n";                                         
+
+
+
+    printf("Count %d\n", count);
+    return results;
+}
+
 std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
                                             DTL::API *api) {
   std::string results;
@@ -1087,6 +1495,24 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
   float *Aw = (float *)ephemeral->GetHeadlessWriteregion();
   float *Ar = (float *)ephemeral->GetHeadlessReadRegion();
   randomize_region_deterministic_float(Aw, in_data_size);
+
+
+  /*
+    DTU:
+    AB = C --> written out into nt store region
+    D
+    ED = F --> written out into nt store region
+
+    NORMAL:
+    AB = C
+    D = im2col(C)
+    ED = F
+    256x256x16 --> 
+    14x14x1024 --> 
+
+    16 layers. DTU for 7
+  */
+
 
   // DTU Benchmark
   perf.CollectCounters();
@@ -2381,3 +2807,4 @@ std::string benchmark::bench_wrapper_cubestencil(const BenchmarkData &bench_data
     return results;
 
 }
+

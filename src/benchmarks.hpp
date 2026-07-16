@@ -23,6 +23,7 @@
 #include "highdim_stencil.hpp"
 #include "cube_stencil.hpp"
 #include "bijective.hpp"
+#include "sparse.hpp"
 
 namespace benchmark
 {
@@ -68,14 +69,294 @@ std::string bench_wrapper_cubestencil(const BenchmarkData& bench_data, DTL::API*
 std::string bench_wrapper_SoA(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_multithread_db(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_multithread_SoA(const BenchmarkData& bench_data, DTL::API* api);
-
-
+std::string bench_wrapper_SpMV(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_sparseAttention(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_ShadowPA_overhead(const BenchmarkData& bench_data, DTL::API* api);
 
 std::string InsertDTLConfigParameters(const BenchmarkData& benchmark_data);
 std::string CreateConstants(const std::unordered_map<std::string, BenchParam>& constants);
 std::string CreateConstantArray(const std::unordered_map<std::string, BenchParam> &constantArray);
 std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
+
+
+
+
+
+
+
+
+static std::vector<BenchmarkData> sparseData = {
+
+    {
+        "shadow_pa",               //  Benchmark
+        {                               // CONSTANTS
+
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_ShadowPA_overhead,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+    {
+        "sparse_attention",               //  Benchmark
+        {                               // CONSTANTS
+            {"M", {1024}},                  // query sequence length
+            {"N", {1024}},                  // key/value sequence length
+            {"D", {64}},                    // Q/K head dimension
+            {"DV", {64}},                   // V/output head dimension
+            {"nnz_per_row", {32}}           // sparse attention width
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_sparseAttention,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+        {
+        "sparse_attention",               //  Benchmark
+        {                               // CONSTANTS
+            {"M", {256}},                  // query sequence length
+            {"N", {65536}},                  // key/value sequence length
+            {"D", {64}},                    // Q/K head dimension
+            {"DV", {64}},                   // V/output head dimension
+            {"nnz_per_row", {32}}           // sparse attention width
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_sparseAttention,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "sparse_attention",               //  Benchmark
+        {                               // CONSTANTS
+            {"M", {256}},                  // query sequence length
+            {"N", {65536}},                  // key/value sequence length
+            {"D", {64}},                    // Q/K head dimension
+            {"DV", {64}},                   // V/output head dimension
+            {"nnz_per_row", {512}}           // sparse attention width
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_sparseAttention,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "sparse_attention",               //  Benchmark
+        {                               // CONSTANTS
+            {"M", {256}},                  // query sequence length
+            {"N", {65536}},                  // key/value sequence length
+            {"D", {64}},                    // Q/K head dimension
+            {"DV", {64}},                   // V/output head dimension
+            {"nnz_per_row", {1024}}           // sparse attention width
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_sparseAttention,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "sparse_attention",               //  Benchmark
+        {                               // CONSTANTS
+            {"M", {256}},                  // query sequence length
+            {"N", {65536}},                  // key/value sequence length
+            {"D", {64}},                    // Q/K head dimension
+            {"DV", {64}},                   // V/output head dimension
+            {"nnz_per_row", {2048}}           // sparse attention width
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_sparseAttention,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+    {
+        "sparse_attention",               //  Benchmark
+        {                               // CONSTANTS
+            {"M", {256}},                  // query sequence length
+            {"N", {65536}},                  // key/value sequence length
+            {"D", {64}},                    // Q/K head dimension
+            {"DV", {64}},                   // V/output head dimension
+            {"nnz_per_row", {4096}}           // sparse attention width
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_wrapper_sparseAttention,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+    {
+        "sparse_matrix_vector",               //  Benchmark
+        {                               // CONSTANTS
+            {"rows", {1024}},
+            {"cols", {1024}},         
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+            {"MAX_NNZ", 1024/2},
+            {"MIN_NNZ", 1024/2}
+        },
+        bench_wrapper_SpMV,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+    {
+        "sparse_matrix_vector",               //  Benchmark
+        {                               // CONSTANTS
+            {"rows", {262144}},
+            {"cols", {1048576}},         
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+            {"MAX_NNZ", 16},
+            {"MIN_NNZ", 16}
+        },
+        bench_wrapper_SpMV,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+
+    //    {
+    //    "sparse_matrix_vector",               //  Benchmark
+    //    {                               // CONSTANTS
+    //        {"rows", {1024*8}},
+    //        {"cols", {1024*8}},         
+    //    },
+    //    {
+//
+    //    },
+    //    {                               // LOOP PARAMETERS
+    //      
+    //    },
+    //    {                               // OTHER
+    //        {"MAX_NNZ", 1024*8/2},
+    //        {"MIN_NNZ", 1024*8/2}
+    //    },
+    //    bench_wrapper_SpMV,    // bench function
+    //    "",                             // artifact in
+    //    ""                              // artifact out
+    //},
+
+    //{
+    //    "sparse_matrix_vector",               //  Benchmark
+    //    {                               // CONSTANTS
+    //        {"rows", {1024}},
+    //        {"cols", {1024}},         
+    //    },
+    //    {
+//
+    //    },
+    //    {                               // LOOP PARAMETERS
+    //            
+    //    },
+    //    {                               // OTHER
+    //        {"MAX_NNZ", 1024/16},
+    //        {"MIN_NNZ", 1024/16}
+    //    },
+    //    bench_wrapper_SpMV,    // bench function
+    //    "",                             // artifact in
+    //    ""                              // artifact out
+    //},
+//
+    //{
+    //    "sparse_matrix_vector",             //  Benchmark
+    //    {                                   // CONSTANTS
+    //        {"rows", {1024}},
+    //        {"cols", {1024}},         
+    //    },
+    //    {
+//
+    //    },
+    //    {                               // LOOP PARAMETERS
+    //        
+    //    },
+    //    {                               // OTHER
+    //        {"MAX_NNZ", 1024/32},
+    //        {"MIN_NNZ", 1024/32}
+    //    },
+    //    bench_wrapper_SpMV,    // bench function
+    //    "",                             // artifact in
+    //    ""                              // artifact out
+    //},
+};
+
+
+
 
 
 static std::vector<BenchmarkData> vol2colData = {

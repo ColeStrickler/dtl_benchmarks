@@ -77,6 +77,43 @@ void randomize_region_deterministic_int(int *data, size_t size) {
     });
 }
 
+void *map_devmem(uint64_t phys_addr, size_t size)
+{
+    long page_size = sysconf(_SC_PAGESIZE);
+
+    uint64_t page_base =
+        phys_addr & ~((uint64_t)page_size - 1);
+
+    uint64_t page_offset =
+        phys_addr - page_base;
+
+    size_t map_size =
+        page_offset + size;
+
+    int fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (fd < 0) {
+        perror("open /dev/mem");
+        exit(EXIT_FAILURE);
+    }
+
+    void *mapped_base = mmap(
+        NULL,
+        map_size,
+        PROT_READ | PROT_WRITE,
+        MAP_SHARED,
+        fd,
+        (off_t)page_base
+    );
+
+    close(fd);
+
+    if (mapped_base == MAP_FAILED) {
+        perror("mmap");
+        exit(EXIT_FAILURE);
+    }
+
+    return (char *)mapped_base + page_offset;
+}
 
 
 int open_fd() {

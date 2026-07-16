@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
 		{1,1,1,1},
 		{0,0,0,1},
 	}, 5, 6, 7, 2, 1, 2);
-  hwStat->nMaxConfigs = 8;
+  hwStat->nMaxConfigs = 4;
   
 
   auto api = new DTL::API(hwStat);
@@ -100,6 +100,38 @@ int main(int argc, char* argv[]) {
 
 
     std::string res = "";
+
+    for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::sparseData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+
+
+
+  return  0;
+
+  for (int i = 0; i < 1; i++)
+  {
+      for (auto& bench: benchmark::vol2colData)
+    {
+        auto bench_res = bench.benchmark(bench, api);
+        res += bench_res;
+        std::cout << bench_res << "\n";
+    }
+    
+  }
+  std::cout << res << "\n";
+  res = "";
+
+
+
       for (int i = 0; i < 1; i++)
   {
       for (auto& bench: benchmark::ImgAugmentationData_nchw)
@@ -134,18 +166,6 @@ int main(int argc, char* argv[]) {
   std::cout << res << "\n";
   res = "";
 
-      for (int i = 0; i < 1; i++)
-  {
-      for (auto& bench: benchmark::vol2colData)
-    {
-        auto bench_res = bench.benchmark(bench, api);
-        res += bench_res;
-        std::cout << bench_res << "\n";
-    }
-    
-  }
-  std::cout << res << "\n";
-  res = "";
 
 
 

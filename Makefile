@@ -43,4 +43,4 @@ $(DTL_DIR)/frontend.hh: $(DTL_DIR)/parser.yy
 # Clean everything
 clean:
 	rm -f $(OUTPUT) $(OBJS)
-	$(MAKE) -C $(DTL_DIR) clean
+   # $(MAKE) -C $(DTL_DIR) clean

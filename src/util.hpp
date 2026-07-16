@@ -50,6 +50,15 @@
 void randomize_region_deterministic(uint8_t* data, size_t size);
 
 
+
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+void *map_devmem(uint64_t phys_addr, size_t size);
 int open_fd();
 volatile void FlushAndDisable(int fd);
 int EnableRelCache(int fd);
