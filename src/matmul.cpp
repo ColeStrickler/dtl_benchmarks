@@ -249,20 +249,30 @@ void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
     // C = M*N
 
 */
-void matmult_conv_blocked(float* A, float* B, float* C, int M, int K, int N)
+void matmult_conv_blocked(
+    const float* __restrict A,
+    const float* __restrict B,
+    float* __restrict C,
+    int M, int K, int N
+) noexcept
 {
-    int i, j, k, ii, jj, kk;
-    int bs = 64; // you can tune this
+    constexpr int bs = 64;
 
-    for(i = 0; i < M; i += bs)
-        for(k = 0; k < K; k += bs)
-            for(j = 0; j < N; j += bs)
-                for(ii = i; ii < std::min(i + bs, M); ii++)
-                    for(kk = k; kk < std::min(k + bs, K); kk++)
-                        for(jj = j; jj < std::min(j + bs, N); jj++)
-                            C[ii*N + jj] += A[ii*K + kk] * B[kk*N + jj];
+    for (int i = 0; i < M; i += bs)
+        for (int k = 0; k < K; k += bs)
+            for (int j = 0; j < N; j += bs)
+                for (int ii = i; ii < std::min(i + bs, M); ++ii)
+                    for (int kk = k; kk < std::min(k + bs, K); ++kk) {
+                        const float a = A[ii * K + kk];
+                        const float* __restrict b = B + kk * N;
+                        float* __restrict c = C + ii * N;
+                        const int end = std::min(j + bs, N);
+
+                        #pragma GCC ivdep
+                        for (int jj = j; jj < end; ++jj)
+                            c[jj] += a * b[jj];
+                    }
 }
-
 
 /*
     This matches benchmark tile_tme

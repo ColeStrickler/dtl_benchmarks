@@ -550,7 +550,6 @@ for (int i = 0; i < [D4]; i++)
 
 
     {"attention_k", \
-    
         R"(
             metadata_stream<4, 0x178000000, nnz> x;
             for (int nnz = 0; nnz < [NNZ]; nnz++)

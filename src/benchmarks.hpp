@@ -89,27 +89,6 @@ std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
 static std::vector<BenchmarkData> sparseData = {
 
     {
-        "shadow_pa",               //  Benchmark
-        {                               // CONSTANTS
-
-        },
-        {
-
-        },
-        {                               // LOOP PARAMETERS
-          
-        },
-        {                               // OTHER
-
-        },
-        bench_ShadowPA_overhead,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-
-
-
-    {
         "sparse_attention",               //  Benchmark
         {                               // CONSTANTS
             {"M", {1024}},                  // query sequence length
@@ -132,7 +111,7 @@ static std::vector<BenchmarkData> sparseData = {
         ""                              // artifact out
     },
 
-        {
+    {
         "sparse_attention",               //  Benchmark
         {                               // CONSTANTS
             {"M", {256}},                  // query sequence length

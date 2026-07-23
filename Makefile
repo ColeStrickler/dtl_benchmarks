@@ -2,8 +2,8 @@
 OUTPUT = dtl_bench
 
 # Cross compiler
-CXX = riscv64-unknown-linux-gnu-g++
-
+#CXX = riscv64-unknown-linux-gnu-g++
+CXX = $(HOME)/opt/riscv-gcc14/bin/riscv64-unknown-linux-gnu-g++
 # Native Compiler
 CXX_X86 = g++
 # Directories
@@ -13,8 +13,28 @@ DTL_DIR     = ./src/dtl/src
 CUSTOM_BOOM_COUNTERS = -DBOOM_PERF_EXTRA
 
 
+  #-march=rv64gcv \
+  #-mabi=lp64d \
+  #-ftree-vectorize \
+  #-fopt-info-vec-optimized \
+  #-fopt-info-vec-missed \
+
+
+
 # Compilation flags
-CXXFLAGS = $(INCLUDE_DIR) -I$(DTL_DIR) -O3 -g -D __aarch64__ -std=c++17 -pthread
+VECTOR_FLAGS = -march=rv64gcv \
+               -mabi=lp64d \
+               -ftree-vectorize \
+               -fopt-info-vec-optimized-missed=vectorization.log
+
+CXXFLAGS = $(INCLUDE_DIR) \
+           -I$(DTL_DIR) \
+           -O3 \
+           -g \
+           -std=c++17 \
+           -pthread \
+           -D__aarch64__ \
+           $(VECTOR_FLAGS)
 
 # C++ source files
 CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp) 
