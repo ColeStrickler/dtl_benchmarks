@@ -1077,6 +1077,10 @@ std::string benchmark::bench_wrapper_SpMV(const BenchmarkData &bench_data, DTL::
 
     perf.ClearCounters();
 
+    
+
+
+
         
     DTL::EphemeralRegion *ephemeral = api->AllocEphemeralRegion(std::max(nrows*max_nnz, ncols)*sizeof(float));
     assert(ephemeral != nullptr);
