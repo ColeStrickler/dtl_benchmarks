@@ -96,28 +96,12 @@ int main(int argc, char* argv[]) {
     return 0;
   }
   PerfManager perf;
+  std::string res;
   std::cout << "benchmark,type,transform_cost," << perf.PrintCountersLabel() << "hash" <<"\n";
 
 
-    std::string res = "";
 
-    for (int i = 0; i < 1; i++)
-  {
-      for (auto& bench: benchmark::sparseData)
-    {
-        auto bench_res = bench.benchmark(bench, api);
-        res += bench_res;
-        std::cout << bench_res << "\n";
-    }
-    
-  }
-  std::cout << res << "\n";
-
-
-
-  return  0;
-
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 10; i++)
   {
       for (auto& bench: benchmark::vol2colData)
     {
@@ -132,7 +116,7 @@ int main(int argc, char* argv[]) {
 
 
 
-      for (int i = 0; i < 1; i++)
+      for (int i = 0; i < 10; i++)
   {
       for (auto& bench: benchmark::ImgAugmentationData_nchw)
     {
@@ -153,7 +137,7 @@ int main(int argc, char* argv[]) {
 
 
 
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < 10; i++)
   {
       for (auto& bench: benchmark::im2colData)
     {
@@ -170,7 +154,7 @@ int main(int argc, char* argv[]) {
 
 
 
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < 10; i++)
   {
       for (auto& bench: benchmark::unfoldData)
     {
@@ -185,7 +169,7 @@ int main(int argc, char* argv[]) {
 
 
 
-      for (int i = 0; i < 1; i++)
+      for (int i = 0; i < 10; i++)
   {
       for (auto& bench: benchmark::colProjData)
     {
@@ -196,34 +180,6 @@ int main(int argc, char* argv[]) {
   }
 
     std::cout << res << "\n";
-  res = "";
-  return 0;
-
-
-  for (int i = 0; i < 1; i++)
-  {
-      for (auto& bench: benchmark::slicingData)
-    {
-        auto bench_res = bench.benchmark(bench, api);
-        res += bench_res;
-        //std::cout << bench_res << "\n";
-    }
-  }
-  std::cout << res << "\n";
-  res = "";
-
-
-  for (int i = 0; i < 10; i++)
-  {
-      for (auto& bench: benchmark::colProjData)
-    {
-        auto bench_res = bench.benchmark(bench, api);
-        res += bench_res;
-        std::cout << bench_res << "\n";
-    }
-    
-  }
-  std::cout << res << "\n";
   res = "";
 
 
