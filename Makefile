@@ -25,7 +25,8 @@ CUSTOM_BOOM_COUNTERS = -DBOOM_PERF_EXTRA
 VECTOR_FLAGS = -march=rv64gcv \
                -mabi=lp64d \
                -ftree-vectorize \
-               -fopt-info-vec-optimized-missed=vectorization.log
+               -fopt-info-vec-optimized-missed=vectorization.log \
+               -DTREE_VECTORIZE_ENABLED
 
 CXXFLAGS = $(INCLUDE_DIR) \
            -I$(DTL_DIR) \
@@ -34,7 +35,8 @@ CXXFLAGS = $(INCLUDE_DIR) \
            -std=c++17 \
            -pthread \
            -D__aarch64__ \
-           $(VECTOR_FLAGS)
+           #-DTREE_VECTORIZE_ENABLED
+           #$(VECTOR_FLAGS)
 
 # C++ source files
 CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp) 
@@ -60,7 +62,11 @@ $(DTL_DIR)/libdtl.a:
 $(DTL_DIR)/frontend.hh: $(DTL_DIR)/parser.yy
 	$(MAKE) -C $(DTL_DIR)
 
+sort:
+	$(CXX) -O3 -std=c++17 sort_compare.cpp -o sort_compare
 # Clean everything
+
+
 clean:
 	rm -f $(OUTPUT) $(OBJS)
-   # $(MAKE) -C $(DTL_DIR) clean
+#$(MAKE) -C $(DTL_DIR) clean

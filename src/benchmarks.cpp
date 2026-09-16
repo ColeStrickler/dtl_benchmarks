@@ -1144,8 +1144,8 @@ std::string benchmark::bench_wrapper_SpMV(const BenchmarkData &bench_data, DTL::
 
 std::string benchmark::bench_wrapper_sparseAttention(const BenchmarkData &bench_data,
                                          DTL::API *api) {
-  std::string results;
-  PerfManager perf;
+    std::string results;
+    PerfManager perf;
 
 
 
@@ -1172,7 +1172,7 @@ std::string benchmark::bench_wrapper_sparseAttention(const BenchmarkData &bench_
     auto buffers = generate_sparse_attention_buffers(M, N, D, DV, nnz_per_row, false, 1234);
     auto buffers2 = generate_sparse_attention_buffers(M, N, D, DV, nnz_per_row, false, 1234);
 
-
+    printf("HERE START COUNTERS\n");
     perf.CollectCounters();
     sparse_attention(M, D, DV, buffers.Q, buffers.K, buffers.V, buffers.row_ptr, buffers.col_idx, buffers.scores, buffers.O);
     perf.CollectDelta();
@@ -1402,6 +1402,19 @@ std::string benchmark::bench_ShadowPA_overhead(const BenchmarkData &bench_data,
     return results;
 }
 
+std::string benchmark::bench_recordSort(const BenchmarkData &bench_data, DTL::API *api)
+{
+    //run_RecordSort<1>(api);
+    run_RecordSort<3>(api);
+    run_RecordSort<7>(api);
+    run_RecordSort<15>(api);
+    run_RecordSort<31>(api);
+    run_RecordSort<63>(api);
+
+    return "";
+    //run_RecordSort<127>();
+}
+
 std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
                                             DTL::API *api) {
   std::string results;
@@ -1491,10 +1504,23 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
     printf("Failed to compile dtl program or map onto agu\n");
     return "Failed to compile dtl program or map onto agu\n";
   }
+  printf("Compiled dtl\n");
   api->ProgramHardware(ephemeral);
+  printf("Programmed hardware\n");
   float *Aw = (float *)ephemeral->GetHeadlessWriteregion();
   float *Ar = (float *)ephemeral->GetHeadlessReadRegion();
+
+  printf("base = %p\n", Aw);
+
+    float x = Aw[0];
+    printf("read succeeded: %.3f\n", x);
+
+    Aw[0] = x;
+    printf("write succeeded\n");
+
+
   randomize_region_deterministic_float(Aw, in_data_size);
+  printf("randomized region\n");
 
 
   /*
@@ -1513,11 +1539,12 @@ std::string benchmark::bench_wrapper_im2col(const BenchmarkData &bench_data,
     16 layers. DTU for 7
   */
 
-
+  printf("Here start dtu bench\n");
   // DTU Benchmark
   perf.CollectCounters();
   matmult_conv_blocked(filter_matrix, Ar, outbuf2, M, K, N);
   perf.CollectDelta();
+  printf("done dtu bench\n");
 
   results += "im2col_" + img_info + "," + "dtu," + "0," + perf.PrintCounters() + "," +
              std::to_string(print_checksum_float(Ar, im2col_matsize)) + "\n";

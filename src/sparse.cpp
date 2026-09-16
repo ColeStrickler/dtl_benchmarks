@@ -1,36 +1,47 @@
 #include "sparse.hpp"
 
-void spmv_csr(int nrows,
-              const int *row_ptr,
-              const int *col_idx,
-              const float *values,
-              const float *x,
-              float *y)
+void spmv_csr(
+    int nrows,
+    const int* __restrict row_ptr,
+    const int* __restrict col_idx,
+    const float* __restrict values,
+    const float* __restrict x,
+    float* __restrict y) noexcept
 {
-    for (int row = 0; row < nrows; row++) {
+    for (int row = 0; row < nrows; ++row) {
+        const int begin = row_ptr[row];
+        const int end   = row_ptr[row + 1];
+
         float sum = 0.0f;
-        for (int k = row_ptr[row];
-             k < row_ptr[row + 1];
-             k++) {
-            sum += values[k] * x[col_idx[k]]; // x[1], x[1000], x[25000]
+
+        #pragma GCC ivdep
+        for (int k = begin; k < end; ++k) {
+            const int column = col_idx[k];
+            sum += values[k] * x[column];
         }
+
         y[row] = sum;
     }
 }
 
-void spmv_dtu(int nrows,
-              const int *row_ptr,
-              const float *values,
-              const float *x_dtu,
-              float *y)
+void spmv_dtu(
+    int nrows,
+    const int* __restrict row_ptr,
+    const float* __restrict values,
+    const float* __restrict x_dtu,
+    float* __restrict y) noexcept
 {
-    for (int row = 0; row < nrows; row++) {
+    for (int row = 0; row < nrows; ++row) {
+        const int begin = row_ptr[row];
+        const int end   = row_ptr[row + 1];
+
         float sum = 0.0f;
-        for (int k = row_ptr[row];
-             k < row_ptr[row + 1];
-             k++) {
-            sum += values[k] * x_dtu[k]; // x[1], x[2], x[3] 
+
+        #pragma GCC ivdep
+        for (int k = begin; k < end; ++k) {
+            sum += values[k] * x_dtu[k];
         }
+
         y[row] = sum;
     }
 }

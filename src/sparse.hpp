@@ -13,17 +13,18 @@
 
 void spmv_csr(
     int nrows,
-    const int* row_ptr,
-    const int* col_idx,
-    const float* values,
-    const float* x,
-    float* y);
+    const int* __restrict row_ptr,
+    const int* __restrict col_idx,
+    const float* __restrict values,
+    const float* __restrict x,
+    float* __restrict y) noexcept;
 
-void spmv_dtu(int nrows,
-              const int *row_ptr,
-              const float *values,
-              const float *x_dtu,
-              float *y);
+void spmv_dtu(
+    int nrows,
+    const int* __restrict row_ptr,
+    const float* __restrict values,
+    const float* __restrict x_dtu,
+    float* __restrict y) noexcept;
 
 
 int generate_csr_random_rows(

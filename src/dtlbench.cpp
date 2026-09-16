@@ -101,9 +101,39 @@ int main(int argc, char* argv[]) {
 
     std::string res = "";
 
+
+        for (int i = 0; i < 1; i++)
+    {
+        for (auto& bench: benchmark::sortData)
+      {
+          auto bench_res = bench.benchmark(bench, api);
+          res += bench_res;
+          std::cout << bench_res << "\n";
+      }
+      
+    }
+    std::cout << res << "\n";
+    res = "";
+
+    
+
+      for (int i = 0; i < 1; i++)
+    {
+        for (auto& bench: benchmark::im2colData)
+      {
+          auto bench_res = bench.benchmark(bench, api);
+          res += bench_res;
+          std::cout << bench_res << "\n";
+      }
+      
+    }
+    std::cout << res << "\n";
+    res = "";
+
+
     for (int i = 0; i < 1; i++)
   {
-      for (auto& bench: benchmark::sparseData)
+      for (auto& bench: benchmark::transposeData)
     {
         auto bench_res = bench.benchmark(bench, api);
         res += bench_res;
@@ -111,11 +141,13 @@ int main(int argc, char* argv[]) {
     }
     
   }
+
+  
+  return 0;
   std::cout << res << "\n";
 
 
 
-  return  0;
 
   for (int i = 0; i < 1; i++)
   {
@@ -144,6 +176,7 @@ int main(int argc, char* argv[]) {
   }
   std::cout << res << "\n";
   res = "";
+    return  0;
 
 
   //for (auto& bench : benchmark::BenchmarkDispatchDataSplitLayouts)
@@ -153,18 +186,6 @@ int main(int argc, char* argv[]) {
 
 
 
-    for (int i = 0; i < 1; i++)
-  {
-      for (auto& bench: benchmark::im2colData)
-    {
-        auto bench_res = bench.benchmark(bench, api);
-        res += bench_res;
-        //std::cout << bench_res << "\n";
-    }
-    
-  }
-  std::cout << res << "\n";
-  res = "";
 
 
 

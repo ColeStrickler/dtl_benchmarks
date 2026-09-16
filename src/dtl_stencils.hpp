@@ -106,7 +106,7 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                         {
                             for (int row = 0; row < [NROWS]; row++)
                             {
-                                out = row*row_size + col*col_size;
+                                out = row*row_size + col;
                             }
                         }
                         )"
@@ -576,6 +576,52 @@ for (int i = 0; i < [D4]; i++)
             }
         )"
     },
+
+
+    { // extract entire record in order defined by metadata
+        "recordsort", \
+        R"(
+            metadata_stream<4, 0x178000000, record> x;
+            for (int record = 0; record < [RECORDS]; record++)
+            {
+                for (int d = 0; d < [PAYLOAD_SIZE]; d++)
+                {
+                    out = x+d;
+                }
+            }
+        )"
+    },
+
+    {// extract fields in order defined by metadata
+        "recordsort_extract", \
+        R"(
+            metadata_stream<4, 0x178000000, record> x;
+            for (int record = 0; record < [RECORDS]; record++)
+            {
+                for (int d = 0; d < [NFIELDS_EXTRACT]; d++)
+                {
+                    out = x*[RECORD_SIZE] + offsets[d]; 
+                }
+            }
+        )"
+    },
+
+    { // extract fileds in order
+        "record_extract", \
+        {
+            R"(
+                for (int record = 0; record < [RECORDS]; record++)
+                {
+                    for (int d = 0; d < [NFIELDS_EXTRACT]; d++)
+                    {
+                        out = record*[RECORD_SIZE] + offsets[d]; 
+                    }
+                }    
+            )"
+        }
+    },
+
+
 
     {"dummy", \
         R"(

@@ -249,6 +249,8 @@ void matmult_opt2_jk_tiling(float *A, float *B, float *C, int dimension)
     // C = M*N
 
 */
+
+#ifdef TREE_VECTORIZE_ENABLED
 void matmult_conv_blocked(
     const float* __restrict A,
     const float* __restrict B,
@@ -273,6 +275,21 @@ void matmult_conv_blocked(
                             c[jj] += a * b[jj];
                     }
 }
+#else
+void matmult_conv_blocked(float* A, float* B, float* C, int M, int K, int N)
+{
+    int i, j, k, ii, jj, kk;
+    int bs = 64; // you can tune this
+
+    for(i = 0; i < M; i += bs)
+        for(k = 0; k < K; k += bs)
+            for(j = 0; j < N; j += bs)
+                for(ii = i; ii < std::min(i + bs, M); ii++)
+                    for(kk = k; kk < std::min(k + bs, K); kk++)
+                        for(jj = j; jj < std::min(j + bs, N); jj++)
+                            C[ii*N + jj] += A[ii*K + kk] * B[kk*N + jj];
+}
+#endif
 
 /*
     This matches benchmark tile_tme

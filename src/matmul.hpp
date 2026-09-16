@@ -45,12 +45,16 @@ void matmult_dtl_transposed_int(int *A, int *B, int *C, int dimension);
 void init_bank_aware_transpose_int(uint64_t base, int* write_out, int dimension);
 
 
+#ifdef TREE_VECTORIZE_ENABLED
 void matmult_conv_blocked(
     const float* __restrict A,
     const float* __restrict B,
     float* __restrict C,
     int M, int K, int N) noexcept;
+#else
 
+void matmult_conv_blocked(float* A, float* B, float* C, int M, int K, int N);
+#endif
 
 void zero_matrix(float* matrix, int dimension);
 

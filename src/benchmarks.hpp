@@ -24,6 +24,8 @@
 #include "cube_stencil.hpp"
 #include "bijective.hpp"
 #include "sparse.hpp"
+#include "sort.hpp"
+
 
 namespace benchmark
 {
@@ -72,6 +74,10 @@ std::string bench_wrapper_multithread_SoA(const BenchmarkData& bench_data, DTL::
 std::string bench_wrapper_SpMV(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_sparseAttention(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_ShadowPA_overhead(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_recordSort(const BenchmarkData& bench_data, DTL::API* api);
+
+
+
 
 std::string InsertDTLConfigParameters(const BenchmarkData& benchmark_data);
 std::string CreateConstants(const std::unordered_map<std::string, BenchParam>& constants);
@@ -82,145 +88,259 @@ std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
 
 
 
+static std::vector<BenchmarkData> transposeData = {
+    {
+        "matmul_transpose",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {80}},         
+            {"col_size", {1}},
+        },
+        {
 
+        },
+        {                               // LOOP PARAMETERS
+            {"NROWS", 80},
+            {"NCOLS", 80}                 
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_matmul_transpose, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+    {
+        "matmul_transpose",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {160}},         
+            {"col_size", {1}},
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"NROWS", 160},
+            {"NCOLS", 160}                 
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_matmul_transpose, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+    {
+        "matmul_transpose",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {320}},         
+            {"col_size", {1}},
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"NROWS", 320},
+            {"NCOLS", 320}                 
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_matmul_transpose, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+
+
+        {
+        "matmul_transpose",             //  Benchmark
+        {                               // CONSTANTS
+            {"row_size", {640}},         
+            {"col_size", {1}},
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+            {"NROWS", 640},
+            {"NCOLS", 640}                 
+        },
+        {                               // OTHER
+    
+        },
+        bench_wrapper_matmul_transpose, // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+};
+
+
+
+static std::vector<BenchmarkData> sortData = {
+        {
+        "sort",               //  Benchmark
+        {                               // CONSTANTS
+  
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_recordSort,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+
+};
 
 
 
 static std::vector<BenchmarkData> sparseData = {
 
-    {
-        "sparse_attention",               //  Benchmark
-        {                               // CONSTANTS
-            {"M", {1024}},                  // query sequence length
-            {"N", {1024}},                  // key/value sequence length
-            {"D", {64}},                    // Q/K head dimension
-            {"DV", {64}},                   // V/output head dimension
-            {"nnz_per_row", {32}}           // sparse attention width
-        },
-        {
-
-        },
-        {                               // LOOP PARAMETERS
-          
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_sparseAttention,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-
-    {
-        "sparse_attention",               //  Benchmark
-        {                               // CONSTANTS
-            {"M", {256}},                  // query sequence length
-            {"N", {65536}},                  // key/value sequence length
-            {"D", {64}},                    // Q/K head dimension
-            {"DV", {64}},                   // V/output head dimension
-            {"nnz_per_row", {32}}           // sparse attention width
-        },
-        {
-
-        },
-        {                               // LOOP PARAMETERS
-          
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_sparseAttention,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-    {
-        "sparse_attention",               //  Benchmark
-        {                               // CONSTANTS
-            {"M", {256}},                  // query sequence length
-            {"N", {65536}},                  // key/value sequence length
-            {"D", {64}},                    // Q/K head dimension
-            {"DV", {64}},                   // V/output head dimension
-            {"nnz_per_row", {512}}           // sparse attention width
-        },
-        {
-
-        },
-        {                               // LOOP PARAMETERS
-          
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_sparseAttention,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-    {
-        "sparse_attention",               //  Benchmark
-        {                               // CONSTANTS
-            {"M", {256}},                  // query sequence length
-            {"N", {65536}},                  // key/value sequence length
-            {"D", {64}},                    // Q/K head dimension
-            {"DV", {64}},                   // V/output head dimension
-            {"nnz_per_row", {1024}}           // sparse attention width
-        },
-        {
-
-        },
-        {                               // LOOP PARAMETERS
-          
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_sparseAttention,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-    {
-        "sparse_attention",               //  Benchmark
-        {                               // CONSTANTS
-            {"M", {256}},                  // query sequence length
-            {"N", {65536}},                  // key/value sequence length
-            {"D", {64}},                    // Q/K head dimension
-            {"DV", {64}},                   // V/output head dimension
-            {"nnz_per_row", {2048}}           // sparse attention width
-        },
-        {
-
-        },
-        {                               // LOOP PARAMETERS
-          
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_sparseAttention,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
-    {
-        "sparse_attention",               //  Benchmark
-        {                               // CONSTANTS
-            {"M", {256}},                  // query sequence length
-            {"N", {65536}},                  // key/value sequence length
-            {"D", {64}},                    // Q/K head dimension
-            {"DV", {64}},                   // V/output head dimension
-            {"nnz_per_row", {4096}}           // sparse attention width
-        },
-        {
-
-        },
-        {                               // LOOP PARAMETERS
-          
-        },
-        {                               // OTHER
-
-        },
-        bench_wrapper_sparseAttention,    // bench function
-        "",                             // artifact in
-        ""                              // artifact out
-    },
+//    {
+//        "sparse_attention",               //  Benchmark
+//        {                               // CONSTANTS
+//            {"M", {1024}},                  // query sequence length
+//            {"N", {1024}},                  // key/value sequence length
+//            {"D", {64}},                    // Q/K head dimension
+//            {"DV", {64}},                   // V/output head dimension
+//            {"nnz_per_row", {32}}           // sparse attention width
+//        },
+//        {
+//
+//        },
+//        {                               // LOOP PARAMETERS
+//          
+//        },
+//        {                               // OTHER
+//
+//        },
+//        bench_wrapper_sparseAttention,    // bench function
+//        "",                             // artifact in
+//        ""                              // artifact out
+//    },
+//
+//    {
+//        "sparse_attention",               //  Benchmark
+//        {                               // CONSTANTS
+//            {"M", {256}},                  // query sequence length
+//            {"N", {65536}},                  // key/value sequence length
+//            {"D", {64}},                    // Q/K head dimension
+//            {"DV", {64}},                   // V/output head dimension
+//            {"nnz_per_row", {32}}           // sparse attention width
+//        },
+//        {
+//
+//        },
+//        {                               // LOOP PARAMETERS
+//          
+//        },
+//        {                               // OTHER
+//
+//        },
+//        bench_wrapper_sparseAttention,    // bench function
+//        "",                             // artifact in
+//        ""                              // artifact out
+//    },
+//    {
+//        "sparse_attention",               //  Benchmark
+//        {                               // CONSTANTS
+//            {"M", {256}},                  // query sequence length
+//            {"N", {65536}},                  // key/value sequence length
+//            {"D", {64}},                    // Q/K head dimension
+//            {"DV", {64}},                   // V/output head dimension
+//            {"nnz_per_row", {512}}           // sparse attention width
+//        },
+//        {
+//
+//        },
+//        {                               // LOOP PARAMETERS
+//          
+//        },
+//        {                               // OTHER
+//
+//        },
+//        bench_wrapper_sparseAttention,    // bench function
+//        "",                             // artifact in
+//        ""                              // artifact out
+//    },
+//    {
+//        "sparse_attention",               //  Benchmark
+//        {                               // CONSTANTS
+//            {"M", {256}},                  // query sequence length
+//            {"N", {65536}},                  // key/value sequence length
+//            {"D", {64}},                    // Q/K head dimension
+//            {"DV", {64}},                   // V/output head dimension
+//            {"nnz_per_row", {1024}}           // sparse attention width
+//        },
+//        {
+//
+//        },
+//        {                               // LOOP PARAMETERS
+//          
+//        },
+//        {                               // OTHER
+//
+//        },
+//        bench_wrapper_sparseAttention,    // bench function
+//        "",                             // artifact in
+//        ""                              // artifact out
+//    },
+//    {
+//        "sparse_attention",               //  Benchmark
+//        {                               // CONSTANTS
+//            {"M", {256}},                  // query sequence length
+//            {"N", {65536}},                  // key/value sequence length
+//            {"D", {64}},                    // Q/K head dimension
+//            {"DV", {64}},                   // V/output head dimension
+//            {"nnz_per_row", {2048}}           // sparse attention width
+//        },
+//        {
+//
+//        },
+//        {                               // LOOP PARAMETERS
+//          
+//        },
+//        {                               // OTHER
+//
+//        },
+//        bench_wrapper_sparseAttention,    // bench function
+//        "",                             // artifact in
+//        ""                              // artifact out
+//    },
+//    {
+//        "sparse_attention",               //  Benchmark
+//        {                               // CONSTANTS
+//            {"M", {256}},                  // query sequence length
+//            {"N", {65536}},                  // key/value sequence length
+//            {"D", {64}},                    // Q/K head dimension
+//            {"DV", {64}},                   // V/output head dimension
+//            {"nnz_per_row", {4096}}           // sparse attention width
+//        },
+//        {
+//
+//        },
+//        {                               // LOOP PARAMETERS
+//          
+//        },
+//        {                               // OTHER
+//
+//        },
+//        bench_wrapper_sparseAttention,    // bench function
+//        "",                             // artifact in
+//        ""                              // artifact out
+//    },
 
 
     {
