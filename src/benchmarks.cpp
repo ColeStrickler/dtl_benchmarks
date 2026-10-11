@@ -1404,12 +1404,23 @@ std::string benchmark::bench_ShadowPA_overhead(const BenchmarkData &bench_data,
 
 std::string benchmark::bench_recordSort(const BenchmarkData &bench_data, DTL::API *api)
 {
+
+    //run_RecordMergeSort<3>(api);
+    //run_RecordMergeSort<7>(api);
+    //run_RecordMergeSort<15>(api);
+    //run_RecordMergeSort<31>(api);
+    //run_RecordMergeSort<63>(api);
+
+
+
     //run_RecordSort<1>(api);
     run_RecordSort<3>(api);
     run_RecordSort<7>(api);
     run_RecordSort<15>(api);
     run_RecordSort<31>(api);
     run_RecordSort<63>(api);
+
+
 
     return "";
     //run_RecordSort<127>();
