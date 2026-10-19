@@ -45,3 +45,10 @@ utility/data/*
 *.jpg
 *.jpeg
 *.png
+
+
+# agents
+server.py
+AGENTS.md
+CODEX_CHANGELOG.md
+archive/*
