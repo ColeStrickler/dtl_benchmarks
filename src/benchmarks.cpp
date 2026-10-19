@@ -88,7 +88,7 @@ std::string benchmark::CreateBenchmarkConfig(const BenchmarkData &benchmark_data
     std::string constants = CreateConstants(benchmark_data.constants);
     std::string config_body = InsertDTLConfigParameters(benchmark_data);
 
-    return constants + "\n"+ config_body;
+    return "DTL<0x0> kernel = {\n" + constants + "\n"+ config_body + "}\nactive kernel;";
 }
 
 std::string benchmark::CreateBenchmarkConfig2(BenchmarkData benchmark_data)
@@ -97,7 +97,7 @@ std::string benchmark::CreateBenchmarkConfig2(BenchmarkData benchmark_data)
     std::string constArr = CreateConstantArray(benchmark_data.constArray);
     std::string config_body = InsertDTLConfigParameters(benchmark_data);
 
-    return constants +"\n" +constArr + "\n"+ config_body;
+    return "DTL<0x0> kernel = {\n" + constants +"\n" +constArr + "\n"+ config_body + "}\nactive kernel;";
 }
 
 std::string benchmark::bench_wrapper_zipStruct(const BenchmarkData &bench_data, DTL::API *api) {
@@ -1085,8 +1085,8 @@ std::string benchmark::bench_wrapper_SpMV(const BenchmarkData &bench_data, DTL::
         printf("Failed to compile dtl program or map onto agu\n");
         return "Failed to compile dtl program or map onto agu\n";
     }
-    api->ProgramHardware(ephemeral);
-        printf("Programmed hardware\n");
+    api->ProgramHardware(ephemeral, {{"x", 0x178000000ULL}});
+    printf("Programmed hardware\n");
 
     float *Aw = (float *)ephemeral->GetHeadlessWriteregion();
     float *Ar = (float *)ephemeral->GetHeadlessReadRegion();
@@ -1094,7 +1094,7 @@ std::string benchmark::bench_wrapper_SpMV(const BenchmarkData &bench_data, DTL::
 
     printf("HERE before COPY\n");
 
-    void* metadata_stream = map_devmem(0x188000000ULL, nrows*max_nnz*sizeof(float));
+    void* metadata_stream = map_devmem(0x178000000ULL, nrows*max_nnz*sizeof(float));
     memcpy(Aw, x, ncols*sizeof(float)); // copy over vector
     memcpy(metadata_stream, col_idx, nrows*max_nnz*sizeof(int));
 
@@ -1227,18 +1227,20 @@ std::string benchmark::bench_wrapper_sparseAttention(const BenchmarkData &bench_
     auto k_kernel = replaceKeyword(k_config, "NNZ", nnz);
     k_kernel = replaceKeyword(k_kernel, "D", D);
     k_kernel = replaceKeyword(k_kernel, "D2", D);
+    k_kernel = "DTL<0x0> kernel = {\n" + k_kernel + "}\nactive kernel;";
+
 
     auto v_kernel = replaceKeyword(v_config, "NNZ", nnz);
     v_kernel = replaceKeyword(v_kernel, "DV", DV);
     v_kernel = replaceKeyword(v_kernel, "DV2", DV);
-
+    v_kernel = "DTL<0x0> kernel = {\n" + v_kernel + "}\nactive kernel;";
 
 
     if (!api->Compile(k_kernel)) {
         printf("Failed to compile dtl program or map onto agu\n");
         return "Failed to compile dtl program or map onto agu\n";
     }
-    api->ProgramHardware(k_region);
+    api->ProgramHardware(k_region,  {{"x", 0x178000000ULL}});
     printf("Programmed k_region\n");
 
     
@@ -1246,12 +1248,11 @@ std::string benchmark::bench_wrapper_sparseAttention(const BenchmarkData &bench_
         printf("Failed to compile dtl program or map onto agu\n");
         return "Failed to compile dtl program or map onto agu\n";
     }
-    api->ProgramHardware(v_region);
+    api->ProgramHardware(v_region,  {{"x", 0x178000000ULL}});
     printf("Programmed v_region\n");
-    
 
 
-    void* colidx_metadata_stream = map_devmem(0x188000000ULL, colidx_bytes);
+    void* colidx_metadata_stream = map_devmem(0x178000000ULL, colidx_bytes);
 
     float *Kw = (float *)k_region->GetHeadlessWriteregion();
     float *K_dtu = (float *)k_region->GetHeadlessReadRegion();

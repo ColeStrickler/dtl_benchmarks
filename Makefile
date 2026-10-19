@@ -69,4 +69,4 @@ sort:
 
 clean:
 	rm -f $(OUTPUT) $(OBJS)
-#$(MAKE) -C $(DTL_DIR) clean
+	$(MAKE) -C $(DTL_DIR) clean

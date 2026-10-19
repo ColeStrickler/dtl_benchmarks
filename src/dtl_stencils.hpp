@@ -8,7 +8,6 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
 
     {"vol2col", \
             R"(
-            DTL kernel = {
                 for (int c = 0; c < [CHANNELS]; c++) {
                     for (int kt = 0; kt < [KT]; kt++) {
                         for (int kh = 0; kh < [KH]; kh++) {
@@ -26,15 +25,12 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                         }
                     }
                 }
-            }
-            active kernel;
             )"
     },
 
 
     {"im2col", \
                 R"(
-                DTL kernel = {
                 for (int c_im = 0; c_im < [CHANNELS]; c_im++) {
                     for (int kh = 0; kh < [KH]; kh++) {
                         for (int kw = 0; kw < [KW]; kw++) {
@@ -46,14 +42,11 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                         }
                     }
                 }
-                }
-                active kernel;
                 )"
     },
 
     {"db_col_project", \
                     R"(
-                    DTL kernel = {
                     for (int i = 0; i < [ROWS]; i++)
                     {
                         for (int j = 0; j < [COLUMNS]; j++)
@@ -61,14 +54,11 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                             out = i*row_size + col_offsets[j];
                         }
                     }
-                    }
-                    active kernel;
                     )"
     },
 
     {"db_join", \
                 R"(
-                DTL kernel = {
 
                 for (int x = 0; x < [NTABLE_COUNT]; x++)
                 {
@@ -92,15 +82,12 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                             
                         }
                     }
-                    }
-                    active kernel;
                     )"
     },
 
 
     {"aos_to_soa", \
                     R"(
-                    DTL kernel = {
                     for (int i = 0; i < [NSTRUCT]; i++)
                     {
                         for (int j = 0; j < [NOFFSETS]; j++)
@@ -108,8 +95,6 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                             out = i*struct_size + var_offsets[j];
                         }
                     }
-                    }
-                    active kernel;
                     )"
     },
 
@@ -117,7 +102,6 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
 
     {"matmul_transpose", \
                         R"(
-                        DTL kernel = {
                         for (int col = 0; col < [NCOLS]; col++)
                         {
                             for (int row = 0; row < [NROWS]; row++)
@@ -125,14 +109,11 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                 out = row*row_size + col;
                             }
                         }
-                        }
-                        active kernel;
                         )"
     },
 
     {"nhwc_permutation", \
                         R"(
-                        DTL kernel = {
                         for (int n = 0; n < [BATCH_SIZE]; n++)
                         {
                             for (int c = 0; c < [CHANNELS]; c++)
@@ -143,13 +124,10 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                 }
                             }
                         }
-                        }
-                        active kernel;
                         )"
     },
     {"batch2space", \
                         R"(
-                        DTL kernel = {
                             for (int c = 0; c < [CHANNELS]; c++)
                             {
                                 for (int h = 0; h < [HEIGHT]; h++)
@@ -163,14 +141,11 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                     }
                                 }
                             }
-                        }
-                        active kernel;
                         )"
     },
 
     {"tensor_unfold1", \
                         R"(
-                        DTL kernel = {
                             for (int k = 0; k < [D2]; k++)
                             {
                                 for (int i = 0; i < [D3]; i++)
@@ -184,14 +159,11 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                     }
                                 }
                             }
-                        }
-                        active kernel;
                         )"
     },
 
     {"tensor_unfold2", \
                         R"(
-                        DTL kernel = {
                             for (int l = 0; l < [D1]; l++)
                             {
                                 for (int i = 0; i < [D3]; i++)
@@ -205,14 +177,11 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                     }
                                 }
                             }
-                        }
-                        active kernel;
                         )"
     },
 
     {"tensor_unfold3", \
                         R"(
-                        DTL kernel = {
                             for (int l = 0; l < [D1]; l++)
                             {
                                 for (int k = 0; k < [D2]; k++)
@@ -226,14 +195,11 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                     }
                                 }
                             }
-                        }
-                        active kernel;
                         )"
     },
 
     {"tensor_unfold4", \
                         R"(
-                        DTL kernel = {
                             for (int l = 0; l < [D1]; l++)
                             {
                                 for (int k = 0; k < [D2]; k++)
@@ -247,8 +213,6 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
                                     }
                                 }
                             }
-                        }
-                        active kernel;
                         )"
     },
 
@@ -256,7 +220,6 @@ static std::unordered_map<std::string, std::string> dtl_stencil_configs = {
     
     {"tensor_slicing", \
                         R"(
-                        DTL kernel = {
 for (int i = 0; i < [D4]; i++)
 {
     for (int j = 0; j < [D3]; j++)
@@ -270,14 +233,11 @@ for (int i = 0; i < [D4]; i++)
         }
     }
 }
-                        }
-                        active kernel;
                         )"
     },
 
     {"highdim_7stencil", \
                         R"(
-                        DTL kernel = {
                             for (int i = 0; i < [NX_MINUS_1]; i++)
                             {
                                 for (int j = 0; j < [NY_MINUS_1]; j++)
@@ -294,14 +254,11 @@ for (int i = 0; i < [D4]; i++)
                                     }
                                 }
                             }
-                        }
-                        active kernel;
                         )"
     },
 
     {"cube_stencil_8corner", \
                     R"(
-                    DTL kernel = {
                         for (int i = 0; i < [N_3DSTRUCT]; i++)
                         {
                             for (int a = 0; a < [NCUBES]; a++)
@@ -318,14 +275,11 @@ for (int i = 0; i < [D4]; i++)
                                 }
                             }
                         }
-                    }
-                    active kernel;
                     )"
     },
 
     {"permute_reflect", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -339,14 +293,11 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {"permute_rot_left", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -360,15 +311,12 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
         
     {"permute_rot_left_reflect", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -382,15 +330,12 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
             
     {"permute_flipy", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -404,14 +349,11 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {"permute_flipy_reflect", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -425,15 +367,12 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
 
     {"permute_rot_right", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -447,14 +386,11 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {"permute_rot_right_reflect", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -468,14 +404,11 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {"permute_reflect_nchw", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -489,14 +422,11 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {"permute_rot_left_nchw", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -510,15 +440,12 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
         
     {"permute_rot_left_reflect_nchw", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -532,15 +459,12 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
             
     {"permute_flipy_nchw", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -554,14 +478,11 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {"permute_flipy_reflect_nchw", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -575,15 +496,12 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
 
     {"permute_rot_right_nchw", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -597,14 +515,11 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {"permute_rot_right_reflect_nchw", \
         R"(
-        DTL kernel = {
             for (int n = 0; n < [NMAX]; n++)
             {
                 for (int c = 0; c < [CMAX]; c++)
@@ -618,8 +533,6 @@ for (int i = 0; i < [D4]; i++)
                     }
                 }
             }
-        }
-        active kernel;
         )"
     },
 
@@ -627,49 +540,40 @@ for (int i = 0; i < [D4]; i++)
 
     {"sparse_matrix_vector", \
         R"(
-        DTL kernel = {
-            metadata_stream<4, 0x178000000, nnz> x;
+            metadata_stream<4, 0x0> x;
             for (int nnz = 0; nnz < [NNZ]; nnz++)
             {
-                out = x; 
+                out = x[nnz]; 
             }
-        }
-        active kernel;
         )"
     },
 
 
     {"attention_k", \
         R"(
-        DTL kernel = {
-            metadata_stream<4, 0x178000000, nnz> x;
+            metadata_stream<4, 0x0> x;
             for (int nnz = 0; nnz < [NNZ]; nnz++)
             {
                 for (int d = 0; d < [D]; d++)
                 {
-                    out = x*[D2] + d; 
+                    out = x[nnz]*[D2] + d; 
                 }
             }
-        }
-        active kernel;
         )"
     },
 
 
     {"attention_v", \
         R"(
-        DTL kernel = {
-            metadata_stream<4, 0x178000000, nnz> x;
+            metadata_stream<4, 0x0> x;
 
             for (int nnz = 0; nnz < [NNZ]; nnz++)
             {
                 for (int d = 0; d < [DV]; d++)
                 {
-                    out = x*[DV2] + d; 
+                    out = x[nnz]*[DV2] + d; 
                 }
             }
-        }
-        active kernel;
         )"
     },
 
@@ -677,34 +581,28 @@ for (int i = 0; i < [D4]; i++)
     { // extract entire record in order defined by metadata
         "recordsort", \
         R"(
-        DTL kernel = {
-            metadata_stream<4, 0x178000000, record> x;
+            metadata_stream<4, 0x0> x;
             for (int record = 0; record < [RECORDS]; record++)
             {
                 for (int d = 0; d < [PAYLOAD_SIZE]; d++)
                 {
-                    out = x+d;
+                    out = x[record]+d;
                 }
             }
-        }
-        active kernel;
         )"
     },
 
     {// extract fields in order defined by metadata
         "recordsort_extract", \
         R"(
-        DTL kernel = {
-            metadata_stream<4, 0x178000000, record> x;
+            metadata_stream<4, 0x0> x;
             for (int record = 0; record < [RECORDS]; record++)
             {
                 for (int d = 0; d < [NFIELDS_EXTRACT]; d++)
                 {
-                    out = x*[RECORD_SIZE] + offsets[d]; 
+                    out = x[record]*[RECORD_SIZE] + offsets[d]; 
                 }
             }
-        }
-        active kernel;
         )"
     },
 
@@ -712,7 +610,6 @@ for (int i = 0; i < [D4]; i++)
         "record_extract", \
         {
             R"(
-            DTL kernel = {
                 for (int record = 0; record < [RECORDS]; record++)
                 {
                     for (int d = 0; d < [NFIELDS_EXTRACT]; d++)
@@ -720,8 +617,6 @@ for (int i = 0; i < [D4]; i++)
                         out = record*[RECORD_SIZE] + offsets[d]; 
                     }
                 }    
-            }
-            active kernel;
             )"
         }
     },
@@ -730,13 +625,10 @@ for (int i = 0; i < [D4]; i++)
 
     {"dummy", \
         R"(
-        DTL kernel = {
             for (int i = 0; i < 100000000; i++)
             {
                 out = i;
             }
-        }
-        active kernel;
         )"
     },
 
