@@ -76,6 +76,7 @@ std::string bench_wrapper_sparseAttention(const BenchmarkData& bench_data, DTL::
 std::string bench_ShadowPA_overhead(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_recordSort(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_Composed(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_gradzatz_invert(const BenchmarkData& bench_data, DTL::API* api);
 
 
 
@@ -85,6 +86,18 @@ std::string CreateConstants(const std::unordered_map<std::string, BenchParam>& c
 std::string CreateConstantArray(const std::unordered_map<std::string, BenchParam> &constantArray);
 std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
+
+static std::vector<BenchmarkData> gradzatzInvertData = {
+    {"gradzatz_invert", {}, {}, {{"CORNERS", 4096}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatz_invert, "", ""},
+    {"gradzatz_invert", {}, {}, {{"CORNERS", 65536}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatz_invert, "", ""},
+    {"gradzatz_invert", {}, {}, {{"CORNERS", 262144}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatz_invert, "", ""},
+};
 
 static std::vector<BenchmarkData> doubleIndirectData = {
     {

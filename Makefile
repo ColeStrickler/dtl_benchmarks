@@ -39,7 +39,7 @@ CXXFLAGS = $(INCLUDE_DIR) \
            #$(VECTOR_FLAGS)
 
 # C++ source files
-CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp) 
+CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_DIR)/ume/*.cpp)
 
 # Object files
 OBJS = $(CPP_SOURCES:.cpp=.o)
@@ -54,6 +54,9 @@ $(OUTPUT): $(OBJS)
 # Compile .cpp files
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(SRC_DIR)/ume/gradzatz_invert.o $(SRC_DIR)/ume/gradzatz_benchmark.o: $(SRC_DIR)/ume/gradzatz_invert.hpp
+$(SRC_DIR)/ume/gradzatz_benchmark.o $(SRC_DIR)/dtlbench.o: $(SRC_DIR)/benchmarks.hpp
 
 # Ensure DTL is built first (including frontend.hh and libdtl.a)
 $(DTL_DIR)/libdtl.a:

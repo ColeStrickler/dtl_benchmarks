@@ -8,6 +8,7 @@
 #include <thread>
 #include <pthread.h>
 #include <sched.h>
+#include <exception>
 
 // User Headers
 
@@ -65,7 +66,11 @@ void toFile_int(const std::string &file, int *res, int dimension) {
 
 
 int main(int argc, char* argv[]) {
-
+  const bool run_gradzatz = argc == 2 && std::string(argv[1]) == "--gradzatz-invert";
+  if (argc > 1 && !run_gradzatz) {
+    std::cerr << "Usage: " << argv[0] << " [--gradzatz-invert]\n";
+    return 1;
+  }
 
   //auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 8, 1, 2);
 	//auto hwStat = new DTL::AGUHardwareStat({ // (nAdd, nMult, nSUb, nPassThru) 
@@ -104,11 +109,16 @@ int main(int argc, char* argv[]) {
 
         for (int i = 0; i < 1; i++)
     {
-        for (auto& bench: benchmark::doubleIndirectData)
+        for (auto& bench: run_gradzatz ? benchmark::gradzatzInvertData : benchmark::doubleIndirectData)
       {
+        try {
           auto bench_res = bench.benchmark(bench, api);
           res += bench_res;
           std::cout << bench_res << "\n";
+        } catch (const std::exception& error) {
+          std::cerr << bench.name << ": " << error.what() << "\n";
+          return 1;
+        }
       }
       
     }
