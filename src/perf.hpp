@@ -13,17 +13,17 @@
 
 #ifndef ACCESS_HELPERS
 #define ACCESS_HELPERS
-#define WRITE_BOOL(addr, value)(*(bool*)(addr) = value)
-#define WRITE_UINT8(addr, value)(*(uint8_t*)(addr) = value)
-#define WRITE_UINT16(addr, value)(*(uint16_t*)(addr) = value)
-#define WRITE_UINT32(addr, value)(*(uint32_t*)(addr) = value)
-#define WRITE_UINT64(addr, value)(*(uint64_t*)(addr) = value)
+#define WRITE_BOOL(addr, value)(*(volatile bool*)(addr) = value)
+#define WRITE_UINT8(addr, value)(*(volatile uint8_t*)(addr) = value)
+#define WRITE_UINT16(addr, value)(*(volatile uint16_t*)(addr) = value)
+#define WRITE_UINT32(addr, value)(*(volatile uint32_t*)(addr) = value)
+#define WRITE_UINT64(addr, value)(*(volatile uint64_t*)(addr) = value)
 
-#define READ_BOOL(addr)(*(bool*)(addr))
-#define READ_UINT8(addr)(*(uint8_t*)(addr))
-#define READ_UINT16(addr)(*(uint16_t*)(addr))
-#define READ_UINT32(addr)(*(uint32_t*)(addr))
-#define READ_UINT64(addr)(*(uint64_t*)(addr))
+#define READ_BOOL(addr)(*(volatile const bool*)(addr))
+#define READ_UINT8(addr)(*(volatile const uint8_t*)(addr))
+#define READ_UINT16(addr)(*(volatile const uint16_t*)(addr))
+#define READ_UINT32(addr)(*(volatile const uint32_t*)(addr))
+#define READ_UINT64(addr)(*(volatile const uint64_t*)(addr))
 #endif
 
 

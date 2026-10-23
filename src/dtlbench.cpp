@@ -104,7 +104,7 @@ int main(int argc, char* argv[]) {
 
         for (int i = 0; i < 1; i++)
     {
-        for (auto& bench: benchmark::sortData)
+        for (auto& bench: benchmark::doubleIndirectData)
       {
           auto bench_res = bench.benchmark(bench, api);
           res += bench_res;
@@ -112,6 +112,8 @@ int main(int argc, char* argv[]) {
       }
       
     }
+
+    return 0;
     std::cout << res << "\n";
     res = "";
 

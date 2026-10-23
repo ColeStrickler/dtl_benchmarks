@@ -75,6 +75,7 @@ std::string bench_wrapper_SpMV(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_sparseAttention(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_ShadowPA_overhead(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_recordSort(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_Composed(const BenchmarkData& bench_data, DTL::API* api);
 
 
 
@@ -85,6 +86,26 @@ std::string CreateConstantArray(const std::unordered_map<std::string, BenchParam
 std::string CreateBenchmarkConfig(const BenchmarkData& benchmark_data);
 std::string CreateBenchmarkConfig2(BenchmarkData benchmark_data);
 
+static std::vector<BenchmarkData> doubleIndirectData = {
+    {
+        "composedTest",               //  Benchmark
+        {                               // CONSTANTS
+  
+        },
+        {
+
+        },
+        {                               // LOOP PARAMETERS
+          
+        },
+        {                               // OTHER
+
+        },
+        bench_Composed,    // bench function
+        "",                             // artifact in
+        ""                              // artifact out
+    },
+};
 
 
 
@@ -203,6 +224,7 @@ static std::vector<BenchmarkData> sortData = {
     },
 
 };
+
 
 
 

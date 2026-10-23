@@ -633,6 +633,28 @@ for (int i = 0; i < [D4]; i++)
     },
 
 
+    {"composedTest", \
+        R"(
+            DTL<0x4000000> base = {
+                metadata_stream<4, 0x4000000> i_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = i_stream[i];
+                }
+            }
+
+            DTL<0x4000000> kernel : base = {
+                metadata_stream<4, base> indirect_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = indirect_stream[i];
+                }
+            }
+            active kernel;
+        )"
+    },
+
+
 };
 
 
