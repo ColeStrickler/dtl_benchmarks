@@ -67,10 +67,23 @@ void toFile_int(const std::string &file, int *res, int dimension) {
 
 int main(int argc, char* argv[]) {
   const bool run_gradzatz = argc == 2 && std::string(argv[1]) == "--gradzatz-invert";
-  if (argc > 1 && !run_gradzatz) {
-    std::cerr << "Usage: " << argv[0] << " [--gradzatz-invert]\n";
+  const bool run_gradzatp = argc == 2 && std::string(argv[1]) == "--gradzatp-invert";
+  const bool run_bfs = argc == 2 && std::string(argv[1]) == "--bfs";
+  const bool run_bfs_file = argc == 3 && std::string(argv[1]) == "--bfs-file";
+  const bool run_nas_cg = argc == 2 && std::string(argv[1]) == "--nas-cg";
+  if (argc > 1 && !run_gradzatz && !run_gradzatp && !run_bfs && !run_bfs_file && !run_nas_cg) {
+    std::cerr << "Usage: " << argv[0] << " [--gradzatz-invert|--gradzatp-invert|--bfs|--bfs-file PATH|--nas-cg]\n";
     return 1;
   }
+  auto bfs_data = benchmark::bfsData;
+  if (run_bfs_file) {
+    bfs_data.resize(1);
+    bfs_data[0].input_artifact = argv[2];
+  }
+  const auto& selected_data = run_nas_cg ? benchmark::nasCgData :
+      ((run_bfs || run_bfs_file) ? bfs_data :
+      (run_gradzatp ? benchmark::gradzatpInvertData :
+       (run_gradzatz ? benchmark::gradzatzInvertData : benchmark::doubleIndirectData)));
 
   //auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 8, 1, 2);
 	//auto hwStat = new DTL::AGUHardwareStat({ // (nAdd, nMult, nSUb, nPassThru) 
@@ -107,9 +120,13 @@ int main(int argc, char* argv[]) {
     std::string res = "";
 
 
+
+    std::cout << res << "\n";
+
+
         for (int i = 0; i < 1; i++)
     {
-        for (auto& bench: run_gradzatz ? benchmark::gradzatzInvertData : benchmark::doubleIndirectData)
+        for (auto& bench: selected_data)
       {
         try {
           auto bench_res = bench.benchmark(bench, api);
@@ -119,6 +136,20 @@ int main(int argc, char* argv[]) {
           std::cerr << bench.name << ": " << error.what() << "\n";
           return 1;
         }
+      }
+      
+    }
+
+    if (run_bfs || run_bfs_file || run_nas_cg)
+      return 0;
+
+          for (int i = 0; i < 1; i++)
+    {
+        for (auto& bench: benchmark::im2colData)
+      {
+          auto bench_res = bench.benchmark(bench, api);
+          res += bench_res;
+          std::cout << bench_res << "\n";
       }
       
     }

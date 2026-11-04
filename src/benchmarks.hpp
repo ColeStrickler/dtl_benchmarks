@@ -77,6 +77,10 @@ std::string bench_ShadowPA_overhead(const BenchmarkData& bench_data, DTL::API* a
 std::string bench_recordSort(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_Composed(const BenchmarkData& bench_data, DTL::API* api);
 std::string bench_wrapper_gradzatz_invert(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_gradzatp_invert(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_bfs(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_bandwidth(const BenchmarkData& bench_data, DTL::API* api);
+std::string bench_wrapper_nas_cg(const BenchmarkData& bench_data, DTL::API* api);
 
 
 
@@ -97,6 +101,73 @@ static std::vector<BenchmarkData> gradzatzInvertData = {
     {"gradzatz_invert", {}, {}, {{"CORNERS", 262144}},
      {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
      bench_wrapper_gradzatz_invert, "", ""},
+    {"gradzatz_invert", {}, {}, {{"CORNERS", 2000000}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatz_invert, "", ""},
+
+    {"gradzatz_invert", {}, {}, {{"CORNERS", 10000000}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatz_invert, "", ""},
+
+    {"gradzatz_invert", {}, {}, {{"CORNERS", 20000000}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatz_invert, "", ""},
+};
+
+static std::vector<BenchmarkData> gradzatpInvertData = {
+    {"gradzatp_invert", {}, {}, {{"CORNERS", 4096}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatp_invert, "", ""},
+    {"gradzatp_invert", {}, {}, {{"CORNERS", 65536}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatp_invert, "", ""},
+    {"gradzatp_invert", {}, {}, {{"CORNERS", 262144}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatp_invert, "", ""},
+    {"gradzatp_invert", {}, {}, {{"CORNERS", 2000000}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatp_invert, "", ""},
+    {"gradzatp_invert", {}, {}, {{"CORNERS", 10000000}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatp_invert, "", ""},
+    {"gradzatp_invert", {}, {}, {{"CORNERS", 20000000}},
+     {{"PADDING", 90000}, {"DISTANCE", 85000}, {"ACTIVE_PERCENT", 95}, {"SEED", 1234}},
+     bench_wrapper_gradzatp_invert, "", ""},
+};
+
+// GAPBS R-MAT generator and SourcePicker use their original deterministic seed.
+// Explicitly top-down, matching the DX100 BFS variant.
+static std::vector<BenchmarkData> bfsData = {
+
+
+    {"bfs_td", {}, {}, {{"SCALE", 12}},
+     {{"DEGREE", 16}, {"UNIFORM", 0}, {"SOURCE", UINT32_MAX}},
+     bench_wrapper_bfs, "", ""},
+    {"bfs_td", {}, {}, {{"SCALE", 16}},
+     {{"DEGREE", 16}, {"UNIFORM", 0}, {"SOURCE", UINT32_MAX}},
+     bench_wrapper_bfs, "", ""},
+    {"bfs_td", {}, {}, {{"SCALE", 20}},
+     {{"DEGREE", 16}, {"UNIFORM", 0}, {"SOURCE", UINT32_MAX}},
+     bench_wrapper_bfs, "", ""},
+    {"bfs_td", {}, {}, {{"SCALE", 22}},
+     {{"DEGREE", 8}, {"UNIFORM", 0}, {"SOURCE", UINT32_MAX}},
+     bench_wrapper_bfs, "", ""},
+    {"bfs_td", {}, {}, {{"SCALE", 22}},
+     {{"DEGREE", 16}, {"UNIFORM", 0}, {"SOURCE", UINT32_MAX}},
+     bench_wrapper_bfs, "", ""},
+};
+
+// Provided FP32 NAS CG variant: four CG steps and one inverse-power iteration.
+static std::vector<BenchmarkData> nasCgData = {
+    {"nas_cg_fp32", {}, {}, {{"ROWS", 4096}},
+     {{"NONZER", 15}, {"CGITMAX", 4}, {"NITER", 1}, {"SHIFT", 110}},
+     bench_wrapper_nas_cg, "", ""},
+    {"nas_cg_fp32", {}, {}, {{"ROWS", 37500}},
+     {{"NONZER", 15}, {"CGITMAX", 4}, {"NITER", 1}, {"SHIFT", 110}},
+     bench_wrapper_nas_cg, "", ""},
+    {"nas_cg_fp32", {}, {}, {{"ROWS", 150000}},
+     {{"NONZER", 15}, {"CGITMAX", 4}, {"NITER", 1}, {"SHIFT", 110}},
+     bench_wrapper_nas_cg, "", ""},
 };
 
 static std::vector<BenchmarkData> doubleIndirectData = {

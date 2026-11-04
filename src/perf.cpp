@@ -75,6 +75,8 @@ void PerfManager::ClearCounters()
 #ifdef INCLUDE_DTU_PERF_COUNTERS
     m_Counters.RegularDRAMAccess = 0;
     m_Counters.DTUDramAccess = 0;
+    m_Counters.DTUPrefetchAccess = 0;
+    m_Counters.DTULLCAccess = 0;
 #endif
 
 }
@@ -108,6 +110,8 @@ std::string PerfManager::PrintCountersLabel() {
 #ifdef INCLUDE_DTU_PERF_COUNTERS
     ret += "RegularDRAMAccess,";
     ret += "DTUDramAccess,";
+    ret += "DTUPrefetchAccess,";
+    ret += "DTULLCAccess,";
 #endif
 
 
@@ -144,6 +148,8 @@ std::string PerfManager::PrintCounters()
 #ifdef INCLUDE_DTU_PERF_COUNTERS
     ret += std::to_string(m_Counters.RegularDRAMAccess) + ",";
     ret += std::to_string(m_Counters.DTUDramAccess) +  ",";
+    ret += std::to_string(m_Counters.DTUPrefetchAccess) + ",";
+    ret += std::to_string(m_Counters.DTULLCAccess) +  ",";
 #endif
 
 
@@ -184,6 +190,10 @@ void PerfManager::CollectCounters() {
 #ifdef INCLUDE_DTU_PERF_COUNTERS
     m_Counters.DTUDramAccess = READ_DTU_ACCESS(m_DTUControlRegionBase);
     m_Counters.RegularDRAMAccess = READ_NONDTU_ACCESS(m_DTUControlRegionBase);
+    m_Counters.DTUPrefetchAccess = READ_PREFETCHDTU_ACCESS(m_DTUControlRegionBase);
+    m_Counters.DTULLCAccess = READ_LLCPORTDTU_ACCESS(m_DTUControlRegionBase);
+
+
 #endif
    // printf("got counters\n");
 }
@@ -220,6 +230,8 @@ void PerfManager::CollectDelta()
 #ifdef INCLUDE_DTU_PERF_COUNTERS
     m_Counters.DTUDramAccess = READ_DTU_ACCESS(m_DTUControlRegionBase) - m_Counters.DTUDramAccess;
     m_Counters.RegularDRAMAccess = READ_NONDTU_ACCESS(m_DTUControlRegionBase) - m_Counters.RegularDRAMAccess;
+    m_Counters.DTUPrefetchAccess = READ_PREFETCHDTU_ACCESS(m_DTUControlRegionBase) - m_Counters.DTUPrefetchAccess;
+    m_Counters.DTULLCAccess = READ_LLCPORTDTU_ACCESS(m_DTUControlRegionBase) - m_Counters.DTULLCAccess;
 #endif
 
 }

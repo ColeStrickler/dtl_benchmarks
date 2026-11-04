@@ -1441,7 +1441,7 @@ std::string benchmark::bench_Composed(const BenchmarkData &bench_data, DTL::API 
     }
 
 
-    DTL::DTUResourceHandle* handle = api->MapTODTUHardware(prog);
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
     if (handle == nullptr)
     {
         printf("handle == nullptr!\n");

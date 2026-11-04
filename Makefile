@@ -10,6 +10,7 @@ CXX_X86 = g++
 INCLUDE_DIR = -I./src -I./src/benchmarks
 SRC_DIR = ./src
 DTL_DIR     = ./src/dtl/src
+GAPBS_DIR ?= ../gapbs
 CUSTOM_BOOM_COUNTERS = -DBOOM_PERF_EXTRA
 
 
@@ -39,7 +40,7 @@ CXXFLAGS = $(INCLUDE_DIR) \
            #$(VECTOR_FLAGS)
 
 # C++ source files
-CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_DIR)/ume/*.cpp)
+CPP_SOURCES = $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(SRC_DIR)/ume/*.cpp) $(wildcard $(SRC_DIR)/gap/*.cpp) $(wildcard $(SRC_DIR)/NAS/*.cpp)
 
 # Object files
 OBJS = $(CPP_SOURCES:.cpp=.o)
@@ -48,19 +49,35 @@ OBJS = $(CPP_SOURCES:.cpp=.o)
 all: $(DTL_DIR)/libdtl.a $(DTL_DIR)/frontend.hh $(OUTPUT)
 
 # Link final binary
-$(OUTPUT): $(OBJS)
+$(OUTPUT): $(OBJS) $(DTL_DIR)/libdtl.a
 	$(CXX) $(CXXFLAGS) $(OBJS) -L$(DTL_DIR) -ldtl -o $@
 
 # Compile .cpp files
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+# CompileProgram's optional arguments are resolved in each caller.
+$(OBJS): $(DTL_DIR)/dtl_api.hpp $(DTL_DIR)/resource_alloc_pass.hpp
+
 $(SRC_DIR)/ume/gradzatz_invert.o $(SRC_DIR)/ume/gradzatz_benchmark.o: $(SRC_DIR)/ume/gradzatz_invert.hpp
 $(SRC_DIR)/ume/gradzatz_benchmark.o $(SRC_DIR)/dtlbench.o: $(SRC_DIR)/benchmarks.hpp
+$(SRC_DIR)/ume/gradzatp_invert.o $(SRC_DIR)/ume/gradzatp_benchmark.o: $(SRC_DIR)/ume/gradzatp_invert.hpp
+$(SRC_DIR)/ume/gradzatp_benchmark.o: $(SRC_DIR)/benchmarks.hpp
+
+$(SRC_DIR)/gap/bfs.o $(SRC_DIR)/gap/bfs_input.o $(SRC_DIR)/gap/bfs_benchmark.o: $(SRC_DIR)/gap/bfs.hpp
+$(SRC_DIR)/gap/bfs_benchmark.o: $(SRC_DIR)/benchmarks.hpp $(SRC_DIR)/gap/bfs_dtu.hpp
+$(SRC_DIR)/gap/bfs_input.o: CXXFLAGS += -I$(GAPBS_DIR)/src
+$(SRC_DIR)/gap/bfs_input.o: $(wildcard $(GAPBS_DIR)/src/*.h)
+
+$(SRC_DIR)/NAS/cg.o $(SRC_DIR)/NAS/cg_benchmark.o: $(SRC_DIR)/NAS/cg.hpp
+$(SRC_DIR)/NAS/cg_benchmark.o: $(SRC_DIR)/benchmarks.hpp $(SRC_DIR)/NAS/cg_dtu.hpp
+$(SRC_DIR)/benchmarks.o: $(SRC_DIR)/benchmarks.hpp
+# Preserve serial float reduction order in both CG implementations.
+$(filter $(SRC_DIR)/NAS/%, $(OBJS)): CXXFLAGS += -fno-tree-vectorize -ffp-contract=off
 
 # Ensure DTL is built first (including frontend.hh and libdtl.a)
-$(DTL_DIR)/libdtl.a:
-	$(MAKE) -C $(DTL_DIR)
+$(DTL_DIR)/libdtl.a: $(wildcard $(DTL_DIR)/*.cpp) $(wildcard $(DTL_DIR)/optimizations/*.cpp) $(DTL_DIR)/Makefile $(DTL_DIR)/dtl_api.hpp $(DTL_DIR)/resource_alloc_pass.hpp
+	$(MAKE) -C $(DTL_DIR) lib CXX_RISCV="$(CXX)"
 
 $(DTL_DIR)/frontend.hh: $(DTL_DIR)/parser.yy
 	$(MAKE) -C $(DTL_DIR)
