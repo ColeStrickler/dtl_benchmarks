@@ -48,9 +48,20 @@ OBJS = $(CPP_SOURCES:.cpp=.o)
 # Default target
 all: $(DTL_DIR)/libdtl.a $(DTL_DIR)/frontend.hh $(OUTPUT)
 
+.PHONY: test-run
+test-run:
+	$(MAKE) -C $(DTL_DIR) test-run
+
 # Link final binary
 $(OUTPUT): $(OBJS) $(DTL_DIR)/libdtl.a
+<<<<<<< HEAD
 	$(CXX) $(CXXFLAGS) $(OBJS) -L$(DTL_DIR) -ldtl -o $@
+=======
+	$(CXX) $(CXXFLAGS) -fopenmp $(OBJS) -L$(DTL_DIR) -ldtl -o $@
+
+# Enable OpenMP for the explicit SingleIndirect benchmark loops.
+$(SRC_DIR)/benchmarks.o: CXXFLAGS += -fopenmp
+>>>>>>> codex/firesim-agent
 
 # Compile .cpp files
 %.o: %.cpp
@@ -71,7 +82,11 @@ $(SRC_DIR)/gap/bfs_input.o: $(wildcard $(GAPBS_DIR)/src/*.h)
 
 $(SRC_DIR)/NAS/cg.o $(SRC_DIR)/NAS/cg_benchmark.o: $(SRC_DIR)/NAS/cg.hpp
 $(SRC_DIR)/NAS/cg_benchmark.o: $(SRC_DIR)/benchmarks.hpp $(SRC_DIR)/NAS/cg_dtu.hpp
+<<<<<<< HEAD
 $(SRC_DIR)/benchmarks.o: $(SRC_DIR)/benchmarks.hpp
+=======
+$(SRC_DIR)/benchmarks.o: $(SRC_DIR)/benchmarks.hpp $(SRC_DIR)/dtl_stencils.hpp
+>>>>>>> codex/firesim-agent
 # Preserve serial float reduction order in both CG implementations.
 $(filter $(SRC_DIR)/NAS/%, $(OBJS)): CXXFLAGS += -fno-tree-vectorize -ffp-contract=off
 
@@ -89,4 +104,4 @@ sort:
 
 clean:
 	rm -f $(OUTPUT) $(OBJS)
-	$(MAKE) -C $(DTL_DIR) clean
+#	$(MAKE) -C $(DTL_DIR) clean

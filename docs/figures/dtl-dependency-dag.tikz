@@ -1,0 +1,56 @@
+% Single-column paper figure; general DAG support is assumed.
+% Natural width: 8.1 cm. All labels remain legible without color.
+\begin{tikzpicture}[
+  x=1cm,y=1cm,
+  font=\normalfont\fontsize{8}{9}\selectfont,
+  kernel/.style={draw=black,line width=0.45pt,rounded corners=1.5pt,
+    minimum width=8mm,minimum height=6mm,inner sep=2pt,
+    font=\normalfont\fontsize{9}{10}\selectfont},
+  edge/.style={-{Latex[length=1.6mm,width=1.1mm]},line width=0.5pt},
+  order/.style={draw=black,line width=0.4pt,minimum width=8mm,
+    minimum height=6mm,inner sep=2pt,
+    font=\normalfont\fontsize{9}{10}\selectfont}
+]
+\path[use as bounding box] (-0.55,-5.45) rectangle (7.55,1.05);
+
+% (a) A shared dependency followed by two levels of composition.
+\node[kernel] (k0) at (0,0) {$K_0$};
+\node[kernel] (k1) at (2,0.65) {$K_1$};
+\node[kernel] (k2) at (2,-0.65) {$K_2$};
+\node[kernel] (k3) at (4.3,0) {$K_3$};
+\node[kernel,double,double distance=0.8pt] (k4) at (6.6,0) {$K_4$};
+\draw[edge] (k0) -- (k1);
+\draw[edge] (k0) -- (k2);
+\draw[edge] (k1) -- (k3);
+\draw[edge] (k2) -- (k3);
+\draw[edge] (k3) -- (k4);
+\node[below=2mm of k0] {shared};
+\node[below=2mm of k4] {active};
+\node at (3.5,-1.25) {(a) Kernel dependency DAG};
+
+% (b) One linear extension of the dependency partial order.
+\node[order] (v0) at (0.3,-2.2) {$K_0$};
+\node[order] (v1) at (1.9,-2.2) {$K_1$};
+\node[order] (v2) at (3.5,-2.2) {$K_2$};
+\node[order] (v3) at (5.1,-2.2) {$K_3$};
+\node[order] (v4) at (6.7,-2.2) {$K_4$};
+\draw[edge] (v0) -- (v1);
+\draw[edge] (v1) -- (v2);
+\draw[edge] (v2) -- (v3);
+\draw[edge] (v3) -- (v4);
+\node at (3.5,-2.95) {(b) Dependency-first compilation order};
+
+% (c) Propagate along a dependency edge, not every adjacent pair in (b).
+% The destination slot is deliberately drawn inside the consuming kernel.
+\node[kernel,minimum width=20mm,minimum height=14mm] (producer) at (0.8,-4.2) {};
+\node at (0.8,-3.85) {Compiled $K_i$};
+\node[draw,minimum width=13mm,minimum height=4.5mm,inner sep=1pt]
+  (shadow) at (0.8,-4.4) {$S_i$};
+\node[kernel,minimum width=29mm,minimum height=14mm] (consumer) at (5.65,-4.2) {};
+\node at (5.65,-3.85) {Next consumer $K_j$};
+\node[draw,minimum width=23mm,minimum height=4.5mm,inner sep=1pt]
+  (slot) at (5.65,-4.4) {mapping slot: $S_i$};
+\draw[edge] (shadow.east) -- node[above,align=center,inner sep=2pt]
+  {propagate\\shadow mapping} (slot.west);
+\node at (3.5,-5.2) {(c) Place $K_i$'s shadow mapping inside $K_j$};
+\end{tikzpicture}

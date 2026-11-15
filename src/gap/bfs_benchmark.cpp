@@ -11,7 +11,6 @@ struct HandleDeleter {
     DTL::API* api;
     void operator()(DTL::DTUResourceHandle* handle) const {
         api->FreeDTUResourceHandle(handle);
-        delete handle;
     }
 };
 using Handle = std::unique_ptr<DTL::DTUResourceHandle, HandleDeleter>;

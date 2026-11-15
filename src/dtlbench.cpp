@@ -71,8 +71,26 @@ int main(int argc, char* argv[]) {
   const bool run_bfs = argc == 2 && std::string(argv[1]) == "--bfs";
   const bool run_bfs_file = argc == 3 && std::string(argv[1]) == "--bfs-file";
   const bool run_nas_cg = argc == 2 && std::string(argv[1]) == "--nas-cg";
-  if (argc > 1 && !run_gradzatz && !run_gradzatp && !run_bfs && !run_bfs_file && !run_nas_cg) {
-    std::cerr << "Usage: " << argv[0] << " [--gradzatz-invert|--gradzatp-invert|--bfs|--bfs-file PATH|--nas-cg]\n";
+  const bool run_single_indirect = argc == 2 && std::string(argv[1]) == "--single-indirect";
+  const bool run_double_indirect = argc == 2 && std::string(argv[1]) == "--double-indirect";
+  const bool run_triple_indirect = argc == 2 && std::string(argv[1]) == "--triple-indirect";
+  const bool run_double_metadata = argc == 2 && std::string(argv[1]) == "--double-metadata";
+  const bool run_small_embedding = argc == 2 && std::string(argv[1]) == "--small-embedding";
+  const bool run_medium_embedding = argc == 2 && std::string(argv[1]) == "--medium-embedding";
+  const bool run_large_embedding = argc == 2 && std::string(argv[1]) == "--large-embedding";
+  const bool run_small_double_indirect_embedding = argc == 2 && std::string(argv[1]) == "--small-double-indirect-embedding";
+  const bool run_medium_double_indirect_embedding = argc == 2 && std::string(argv[1]) == "--medium-double-indirect-embedding";
+  const bool run_large_double_indirect_embedding = argc == 2 && std::string(argv[1]) == "--large-double-indirect-embedding";
+  const bool run_microbenchmark = run_single_indirect || run_double_indirect || run_triple_indirect ||
+      run_double_metadata || run_small_embedding || run_medium_embedding || run_large_embedding ||
+      run_small_double_indirect_embedding || run_medium_double_indirect_embedding || run_large_double_indirect_embedding;
+  if (argc > 1 && !run_gradzatz && !run_gradzatp && !run_bfs && !run_bfs_file && !run_nas_cg && !run_microbenchmark) {
+    std::cerr << "Usage: " << argv[0]
+              << " [--gradzatz-invert|--gradzatp-invert|--bfs|--bfs-file PATH|--nas-cg|"
+              << "--single-indirect|--double-indirect|--triple-indirect|--double-metadata|"
+              << "--small-embedding|--medium-embedding|--large-embedding|"
+              << "--small-double-indirect-embedding|--medium-double-indirect-embedding|--large-double-indirect-embedding]\n";
+
     return 1;
   }
   auto bfs_data = benchmark::bfsData;
@@ -80,10 +98,37 @@ int main(int argc, char* argv[]) {
     bfs_data.resize(1);
     bfs_data[0].input_artifact = argv[2];
   }
-  const auto& selected_data = run_nas_cg ? benchmark::nasCgData :
-      ((run_bfs || run_bfs_file) ? bfs_data :
-      (run_gradzatp ? benchmark::gradzatpInvertData :
-       (run_gradzatz ? benchmark::gradzatzInvertData : benchmark::doubleIndirectData)));
+
+  const auto* selected_data = &benchmark::doubleIndirectData;
+  if (run_single_indirect)
+    selected_data = &benchmark::singleIndirectData;
+  else if (run_double_indirect)
+    selected_data = &benchmark::doubleIndirectData;
+  else if (run_triple_indirect)
+    selected_data = &benchmark::tripleIndirectData;
+  else if (run_double_metadata)
+    selected_data = &benchmark::doubleMetadataData;
+  else if (run_small_embedding)
+    selected_data = &benchmark::smallEmbeddingData;
+  else if (run_medium_embedding)
+    selected_data = &benchmark::mediumEmbeddingData;
+  else if (run_large_embedding)
+    selected_data = &benchmark::largeEmbeddingData;
+  else if (run_small_double_indirect_embedding)
+    selected_data = &benchmark::smallDoubleIndirectEmbeddingData;
+  else if (run_medium_double_indirect_embedding)
+    selected_data = &benchmark::mediumDoubleIndirectEmbeddingData;
+  else if (run_large_double_indirect_embedding)
+    selected_data = &benchmark::largeDoubleIndirectEmbeddingData;
+  else if (run_nas_cg)
+    selected_data = &benchmark::nasCgData;
+  else if (run_bfs || run_bfs_file)
+    selected_data = &bfs_data;
+  else if (run_gradzatp)
+    selected_data = &benchmark::gradzatpInvertData;
+  else if (run_gradzatz)
+    selected_data = &benchmark::gradzatzInvertData;
+
 
   //auto hwStat = new DTL::AGUHardwareStat(4, 4, 5, 6, 5, 4, 8, 1, 2);
 	//auto hwStat = new DTL::AGUHardwareStat({ // (nAdd, nMult, nSUb, nPassThru) 
@@ -126,7 +171,7 @@ int main(int argc, char* argv[]) {
 
         for (int i = 0; i < 1; i++)
     {
-        for (auto& bench: selected_data)
+      for (auto& bench: *selected_data)
       {
         try {
           auto bench_res = bench.benchmark(bench, api);
@@ -140,7 +185,9 @@ int main(int argc, char* argv[]) {
       
     }
 
-    if (run_bfs || run_bfs_file || run_nas_cg)
+
+    if (run_bfs || run_bfs_file || run_nas_cg || run_microbenchmark)
+
       return 0;
 
           for (int i = 0; i < 1; i++)
