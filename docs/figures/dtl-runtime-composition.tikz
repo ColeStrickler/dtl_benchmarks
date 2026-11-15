@@ -1,0 +1,101 @@
+% Metadata composition in the repository's doubleIndirect benchmark.
+% Arrows describe logical dependencies, not individual bus transactions.
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >=Latex,
+  box/.style={draw=black!30,rounded corners=3pt,align=center,
+              minimum height=1.15cm,inner sep=7pt},
+  setup/.style={box,fill=black!3,text width=4.45cm},
+  view/.style={box,draw=blue!55!black,fill=blue!6,
+               minimum height=1.65cm,text width=3.25cm},
+  memory/.style={box,draw=teal!65!black,fill=teal!6,text width=3.2cm},
+  value/.style={->,very thick,draw=teal!65!black},
+  request/.style={->,thick,dashed,draw=blue!65!black},
+  control/.style={->,thick,draw=black!50},
+  label/.style={font=\sffamily\scriptsize,align=center,fill=white,inner sep=2pt}
+]
+\node[anchor=west,font=\sffamily\bfseries\Large] at (-1.5,2.5)
+  {DTL kernel composition at runtime};
+\node[anchor=west,text=black!65] at (-1.5,1.95)
+  {Metadata composition: $V_{\mathrm{base}}[i]=B[C[i]]$,\quad
+   $V_{\mathrm{kernel}}[i]=A[V_{\mathrm{base}}[i]]=A[B[C[i]]]$};
+
+\node[anchor=west,font=\sffamily\bfseries] at (-1.5,1.35)
+  {1\quad Configure the composed views};
+\node[setup] (compile) at (1,0)
+  {\textbf{Compile the active kernel}\\[3pt]
+   \texttt{CompileProgram()}\\
+   Dependency order: \texttt{base}, then \texttt{kernel}};
+\node[setup] (map) at (6.7,0)
+  {\textbf{Program each view}\\[3pt]
+   \texttt{MapToDTUHardware()}\\
+   Backing + logical view\\
+   + configuration};
+\node[setup] (bind) at (12.4,0)
+  {\textbf{Bind metadata}\\[3pt]
+   \texttt{kernel.indirect\_stream}\\
+   points to \texttt{base}'s shadow physical address};
+\draw[control] (compile) -- (map);
+\draw[control] (map) -- (bind);
+
+\draw[black!15] (-1.5,-1.15) -- (15,-1.15);
+\node[anchor=west,font=\sffamily\bfseries] at (-1.5,-1.7)
+  {2\quad Resolve a CPU load through the composed views};
+\node[anchor=west,text=black!65,font=\sffamily\scriptsize] at (-1.5,-2.15)
+  {Initialization has populated $C$, $B$, and $A$ through their write mappings and published the writes.};
+
+\node[memory,text width=1.8cm,minimum height=1.65cm] (c) at (0,-4.7)
+  {\textbf{Metadata $C$}\\[4pt]
+   Ordinary memory\\
+   \texttt{i\_stream}};
+\node[view] (base) at (4.4,-4.7)
+  {\textbf{DTL view: base}\\[4pt]
+   $V_{\mathrm{base}}[i]=B[C[i]]$\\
+   Own DTU configuration};
+\node[view] (kernel) at (9.3,-4.7)
+  {\textbf{DTL view: kernel}\\[4pt]
+   $V_{\mathrm{kernel}}[i]=A[V_{\mathrm{base}}[i]]$\\
+   Active DTU configuration};
+\node[box,fill=orange!9,draw=orange!60!black,text width=2.15cm,
+      minimum height=1.65cm] (cpu) at (13.7,-4.7)
+  {\textbf{CPU}\\[4pt]
+   Load \texttt{r\_a\_obj[i]}\\
+   from active read view};
+
+% Nested requests move right to left, above the value path.
+\draw[request] (cpu.north) -- ++(0,0.7) -|
+  node[label,pos=0.25,above] {\textbf{1} Read $V_{\mathrm{kernel}}[i]$} (kernel.north);
+\draw[request] (kernel.north) -- ++(0,0.7) -|
+  node[label,pos=0.25,above] {\textbf{2} Read metadata $V_{\mathrm{base}}[i]$} (base.north);
+\draw[request] (base.north) -- ++(0,0.7) -|
+  node[label,pos=0.25,above] {\textbf{3} Read $C[i]$} (c.north);
+
+% Returned values feed the next view's address generation.
+\draw[value] (c.east) -- node[label,above] {$C[i]$} (base.west);
+\draw[value] (base.east) -- node[label,above] {$B[C[i]]$\\index} (kernel.west);
+\draw[value] (kernel.east) -- node[label,above] {$A[B[C[i]]]$} (cpu.west);
+
+\node[memory] (b) at (4.4,-7.4)
+  {\textbf{Backing array $B$}\\[3pt]
+   {\scriptsize\texttt{base->GetWriteRegion()}}};
+\node[memory] (a) at (9.3,-7.4)
+  {\textbf{Backing array $A$}\\[3pt]
+   {\scriptsize\texttt{kernel->GetWriteRegion()}}};
+\draw[request] ($(base.south)+(-0.65,0)$) --
+  node[label,left] {\textbf{4} Read $B[C[i]]$} ($(b.north)+(-0.65,0)$);
+\draw[value] ($(b.north)+(0.65,0)$) -- ($(base.south)+(0.65,0)$);
+\draw[request] ($(kernel.south)+(-0.65,0)$) --
+  node[label,left] {\textbf{5} Read $A[B[C[i]]]$} ($(a.north)+(-0.65,0)$);
+\draw[value] ($(a.north)+(0.65,0)$) -- ($(kernel.south)+(0.65,0)$);
+
+\draw[request] (-1.35,-8.6) -- (0,-8.6);
+\node[anchor=west] at (0.1,-8.6) {Logical read request};
+\draw[value] (5,-8.6) -- (6.35,-8.6);
+\node[anchor=west] at (6.45,-8.6) {Returned value};
+\node[anchor=west,align=left,text width=16.3cm,font=\sffamily\scriptsize,
+      text=black!70] at (-1.5,-9.4)
+  {\textbf{Runtime link:} \texttt{kernel->m\_SubHandles["base"]} retains the dependency handle;
+   \texttt{kernel.indirect\_stream} aliases the base view's read/write regions.\\[3pt]
+   The intermediate $B[C[i]]$ is supplied through a composed logical view; the application does not
+   build an intermediate array. Arrows show logical dependencies; caching and request granularity are omitted.};
+\end{tikzpicture}

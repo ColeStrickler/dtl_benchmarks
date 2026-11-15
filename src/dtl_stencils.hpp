@@ -655,6 +655,223 @@ for (int i = 0; i < [D4]; i++)
     },
 
 
+    { // A[B[i]]; 4 bytes per access
+        "singleIndirect", \
+        R"(
+            DTL<0x40000000> kernel = {
+                metadata_stream<4, 0x4000000> b_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = b_stream[i];
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[C[i]]]; 4 bytes per access
+        "doubleIndirect", \
+        R"(
+            DTL<0x4000000> base = {
+                metadata_stream<4, 0x4000000> i_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = i_stream[i];
+                }
+            }
+
+            DTL<0x4000000> kernel : base = {
+                metadata_stream<4, base> indirect_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = indirect_stream[i];
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[C[D[i]]]]; 4 bytes per access
+        "tripleIndirect", \
+        R"(
+            DTL<0x4000000> inner = {
+                metadata_stream<4, 0x4000000> d_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = d_stream[i];
+                }
+            }
+
+            DTL<0x4000000> base : inner = {
+                metadata_stream<4, inner> i_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = i_stream[i];
+                }
+            }
+
+            DTL<0x4000000> kernel : base = {
+                metadata_stream<4, base> indirect_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = indirect_stream[i];
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[i]+C[i]]; 4 bytes per access
+        "doubleMetadata", \
+        R"(
+            DTL<0x4000000> kernel = {
+                metadata_stream<4, 0x4000000> b_stream;
+                metadata_stream<4, 0x4000000> c_stream;
+                for (int i = 0; i < 0x1000000; i++)
+                {
+                    out = b_stream[i]+c_stream[i];
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[i]][j]; 64 bytes per access
+        "smallEmbedding", \
+        R"(
+            DTL<0x4000000> kernel = {
+                metadata_stream<4, 0x400000> b_stream;
+                for (int i = 0; i < 0x100000; i++)
+                {
+                    for (int j = 0; j < 16; j++)
+                    {
+                        out = b_stream[i]*16+j;
+                    }
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[i]][j]; 128 bytes per access
+        "mediumEmbedding", \
+        R"(
+            DTL<0x4000000> kernel = {
+                metadata_stream<4, 0x200000> b_stream;
+                for (int i = 0; i < 0x80000; i++)
+                {
+                    for (int j = 0; j < 32; j++)
+                    {
+                        out = b_stream[i]*32+j;
+                    }
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[i]][j]; 256 bytes per access
+        "largeEmbedding", \
+        R"(
+            DTL<0x4000000> kernel = {
+                metadata_stream<4, 0x100000> b_stream;
+                for (int i = 0; i < 0x40000; i++)
+                {
+                    for (int j = 0; j < 64; j++)
+                    {
+                        out = b_stream[i]*64+j;
+                    }
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[C[i]+j]][d]; 64 bytes per access
+        "smallDoubleIndirectEmbedding", \
+        R"(
+            DTL<0x400000> base = {
+                metadata_stream<4, 0x40000> i_stream;
+                for (int i = 0; i < 0x10000; i++)
+                {
+                    for (int j = 0; j < 16; j++)
+                    {
+                        out = i_stream[i]+j;
+                    }
+                }
+            }
+
+            DTL<0x4000000> kernel : base = {
+                metadata_stream<4, base> indirect_stream;
+                for (int i = 0; i < 0x100000; i++)
+                {
+                    for (int d = 0; d < 16; d++)
+                    {
+                        out = indirect_stream[i]*16+d;
+                    }
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[C[i]+j]][d]; 128 bytes per access
+        "mediumDoubleIndirectEmbedding", \
+        R"(
+            DTL<0x200000> base = {
+                metadata_stream<4, 0x20000> i_stream;
+                for (int i = 0; i < 0x8000; i++)
+                {
+                    for (int j = 0; j < 16; j++)
+                    {
+                        out = i_stream[i]+j;
+                    }
+                }
+            }
+
+            DTL<0x4000000> kernel : base = {
+                metadata_stream<4, base> indirect_stream;
+                for (int i = 0; i < 0x80000; i++)
+                {
+                    for (int d = 0; d < 32; d++)
+                    {
+                        out = indirect_stream[i]*32+d;
+                    }
+                }
+            }
+            active kernel;
+        )"
+    },
+
+    { // A[B[C[i]+j]][d]; 256 bytes per access
+        "largeDoubleIndirectEmbedding", \
+        R"(
+            DTL<0x100000> base = {
+                metadata_stream<4, 0x10000> i_stream;
+                for (int i = 0; i < 0x4000; i++)
+                {
+                    for (int j = 0; j < 16; j++)
+                    {
+                        out = i_stream[i]+j;
+                    }
+                }
+            }
+
+            DTL<0x4000000> kernel : base = {
+                metadata_stream<4, base> indirect_stream;
+                for (int i = 0; i < 0x40000; i++)
+                {
+                    for (int d = 0; d < 64; d++)
+                    {
+                        out = indirect_stream[i]*64+d;
+                    }
+                }
+            }
+            active kernel;
+        )"
+    },
+
+
 };
 
 

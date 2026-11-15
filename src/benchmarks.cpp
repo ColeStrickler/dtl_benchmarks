@@ -1,4 +1,5 @@
 #include "benchmarks.hpp"
+#include <new>
 
 /*
     Function to parameterize the DTL configuration
@@ -1427,13 +1428,93 @@ std::string benchmark::bench_recordSort(const BenchmarkData &bench_data, DTL::AP
     //run_RecordSort<127>();
 }
 
-std::string benchmark::bench_Composed(const BenchmarkData &bench_data, DTL::API *api)
+std::string benchmark::bench_SingleIndirect(const BenchmarkData &bench_data, DTL::API *api)
 {
     std::string results;
     PerfManager perf;
 
 
-    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["composedTest"]);
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["singleIndirect"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    assert(handle->m_MetaDataRegions.find("b_stream") != handle->m_MetaDataRegions.end());
+    DTL::MetadataRegion* metastream = handle->m_MetaDataRegions.at("b_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int* w_a_obj = (int*)handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* b = new int[0x1000000];
+    int* a = new int[0x10000000];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> dist(0, 0x10000000-1);
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = dist(rng);
+        w_meta[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x10000000; i++)
+    {
+        int val = dist(rng);
+        w_a_obj[i] = val;
+        a[i] = val;
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    #pragma omp parallel for schedule(static) reduction(+:hash1)
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash1 += a[b[i]];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    #pragma omp parallel for schedule(static) reduction(+:hash2)
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    delete[] a;
+    delete[] b;
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_DoubleIndirect(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["doubleIndirect"]);
     if (!api->CheckHasAvailableResources(prog))
     {
         printf("Does not have available resources\n");
@@ -1441,7 +1522,7 @@ std::string benchmark::bench_Composed(const BenchmarkData &bench_data, DTL::API 
     }
 
 
-    DTL::DTUResourceHandle* handle = api->MapTODTUHardware(prog);
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
     if (handle == nullptr)
     {
         printf("handle == nullptr!\n");
@@ -1509,7 +1590,7 @@ std::string benchmark::bench_Composed(const BenchmarkData &bench_data, DTL::API 
         hash1 += a[b[meta[i]]];
     }
     perf.CollectDelta();
-    std::cout << perf.PrintCountersLabel << ",hash\n"; 
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
     std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
 
 
@@ -1522,7 +1603,7 @@ std::string benchmark::bench_Composed(const BenchmarkData &bench_data, DTL::API 
         hash2 += r_a_obj[i];
     }
     perf.CollectDelta();
-    std::cout << perf.PrintCountersLabel << ",hash\n"; 
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
     std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
 
 
@@ -1531,6 +1612,786 @@ std::string benchmark::bench_Composed(const BenchmarkData &bench_data, DTL::API 
     delete[] a;
     delete[] b;
     delete[] meta;
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_TripleIndirect(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["tripleIndirect"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    assert(handle->m_MetaDataRegions.find("indirect_stream") != handle->m_MetaDataRegions.end());
+    assert(handle->m_SubHandles.find("base") != handle->m_SubHandles.end());
+    DTL::DTUResourceHandle* baseHandle = handle->m_SubHandles.at("base");
+    assert(baseHandle != nullptr);
+    assert(baseHandle->m_MetaDataRegions.find("i_stream") != baseHandle->m_MetaDataRegions.end());
+    assert(baseHandle->m_SubHandles.find("inner") != baseHandle->m_SubHandles.end());
+    DTL::DTUResourceHandle* innerHandle = baseHandle->m_SubHandles.at("inner");
+    assert(innerHandle != nullptr);
+    assert(innerHandle->m_MetaDataRegions.find("d_stream") != innerHandle->m_MetaDataRegions.end());
+
+    DTL::MetadataRegion* metastream = innerHandle->m_MetaDataRegions.at("d_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int* w_c_obj = (int*)innerHandle->GetWriteRegion();
+    int* w_b_obj = (int*)baseHandle->GetWriteRegion();
+    int* w_a_obj = (int*)handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* d = new int[0x1000000];
+    int* c = new int[0x1000000];
+    int* b = new int[0x1000000];
+    int* a = new int[0x1000000];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = dist(rng);
+        w_meta[i] = val;
+        d[i] = val;
+    }
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = dist(rng);
+        w_c_obj[i] = val;
+        c[i] = val;
+    }
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = dist(rng);
+        w_b_obj[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = dist(rng);
+        w_a_obj[i] = val;
+        a[i] = val;
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash1 += a[b[c[d[i]]]];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    delete[] a;
+    delete[] b;
+    delete[] c;
+    delete[] d;
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_DoubleMetadata(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+    // This kernel reads two independent metadata streams in the same view.
+    if (api->GetHWStat()->nMetadataStreams < 2)
+    {
+        printf("DoubleMetadata requires two metadata streams per DTU view\n");
+        return "";
+    }
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["doubleMetadata"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    assert(handle->m_MetaDataRegions.find("b_stream") != handle->m_MetaDataRegions.end());
+    assert(handle->m_MetaDataRegions.find("c_stream") != handle->m_MetaDataRegions.end());
+    DTL::MetadataRegion* bstream = handle->m_MetaDataRegions.at("b_stream");
+    DTL::MetadataRegion* cstream = handle->m_MetaDataRegions.at("c_stream");
+    assert(bstream->isNormalMemoryRegion());
+    assert(cstream->isNormalMemoryRegion());
+    int* w_b_meta = (int*)bstream->GetMetadataWriteRegion();
+    int* w_c_meta = (int*)cstream->GetMetadataWriteRegion();
+    int* w_a_obj = (int*)handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* b = new int[0x1000000];
+    int* c = new int[0x1000000];
+    int* a = new int[0x1000000];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> b_dist(0, 0x800000-1);
+    std::uniform_int_distribution<int> c_dist(0, 0x800000);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+
+    // Independent metadata; the largest B[i] + C[i] is 0x1000000-1.
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = b_dist(rng);
+        w_b_meta[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = c_dist(rng);
+        w_c_meta[i] = val;
+        c[i] = val;
+    }
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        int val = dist(rng);
+        w_a_obj[i] = val;
+        a[i] = val;
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash1 += a[b[i]+c[i]];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    delete[] a;
+    delete[] b;
+    delete[] c;
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_SmallEmbedding(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["smallEmbedding"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    // 16 four-byte values per embedding; A and the output each occupy 64 MiB.
+    assert(handle->m_MetaDataRegions.find("b_stream") != handle->m_MetaDataRegions.end());
+    DTL::MetadataRegion* metastream = handle->m_MetaDataRegions.at("b_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int (*w_a_obj)[16] = (int (*)[16])handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* b = new (std::align_val_t{64}) int[0x100000];
+    int (*a)[16] = new (std::align_val_t{64}) int[0x100000][16];
+    
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> b_dist(0, 0x100000-1);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+    static_assert(sizeof(a[0]) == 64);
+    for (int i = 0; i < 0x100000; i++)
+    {
+        int val = b_dist(rng);
+        w_meta[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x100000; i++)
+    {
+        for (int d = 0; d < 16; d++)
+        {
+            int val = dist(rng);
+            w_a_obj[i][d] = val;
+            a[i][d] = val;
+        }
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x100000; i++)
+    {
+        for (int j = 0; j < 16; j++)
+        {
+            hash1 += a[b[i]][j];
+        }
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    ::operator delete[](a, std::align_val_t{64});
+    ::operator delete[](b, std::align_val_t{64});
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_MediumEmbedding(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["mediumEmbedding"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    // 32 four-byte values per embedding; A and the output each occupy 64 MiB.
+    assert(handle->m_MetaDataRegions.find("b_stream") != handle->m_MetaDataRegions.end());
+    DTL::MetadataRegion* metastream = handle->m_MetaDataRegions.at("b_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int (*w_a_obj)[32] = (int (*)[32])handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* b = new (std::align_val_t{64}) int[0x80000];
+    int (*a)[32] = new (std::align_val_t{64}) int[0x80000][32];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> b_dist(0, 0x80000-1);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+
+    for (int i = 0; i < 0x80000; i++)
+    {
+        int val = b_dist(rng);
+        w_meta[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x80000; i++)
+    {
+        for (int d = 0; d < 32; d++)
+        {
+            int val = dist(rng);
+            w_a_obj[i][d] = val;
+            a[i][d] = val;
+        }
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x80000; i++)
+    {
+        for (int j = 0; j < 32; j++)
+        {
+            hash1 += a[b[i]][j];
+        }
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    ::operator delete[](a, std::align_val_t{64});
+    ::operator delete[](b, std::align_val_t{64});
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_LargeEmbedding(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["largeEmbedding"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    // 64 four-byte values per embedding; A and the output each occupy 64 MiB.
+    assert(handle->m_MetaDataRegions.find("b_stream") != handle->m_MetaDataRegions.end());
+    DTL::MetadataRegion* metastream = handle->m_MetaDataRegions.at("b_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int (*w_a_obj)[64] = (int (*)[64])handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* b = new (std::align_val_t{64}) int[0x40000];
+    int (*a)[64] = new (std::align_val_t{64}) int[0x40000][64];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> b_dist(0, 0x40000-1);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+
+    for (int i = 0; i < 0x40000; i++)
+    {
+        int val = b_dist(rng);
+        w_meta[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x40000; i++)
+    {
+        for (int d = 0; d < 64; d++)
+        {
+            int val = dist(rng);
+            w_a_obj[i][d] = val;
+            a[i][d] = val;
+        }
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x40000; i++)
+    {
+        for (int j = 0; j < 64; j++)
+        {
+            hash1 += a[b[i]][j];
+        }
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    ::operator delete[](a, std::align_val_t{64});
+    ::operator delete[](b, std::align_val_t{64});
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_SmallDoubleIndirectEmbedding(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["smallDoubleIndirectEmbedding"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    // 16 four-byte values per row; exactly 16 embeddings per i (0 <= j < 16).
+    assert(handle->m_MetaDataRegions.find("indirect_stream") != handle->m_MetaDataRegions.end());
+    assert(handle->m_SubHandles.find("base") != handle->m_SubHandles.end());
+    DTL::DTUResourceHandle* baseHandle = handle->m_SubHandles.at("base");
+    assert(baseHandle != nullptr);
+    assert(baseHandle->m_MetaDataRegions.find("i_stream") != baseHandle->m_MetaDataRegions.end());
+
+    DTL::MetadataRegion* metastream = baseHandle->m_MetaDataRegions.at("i_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int* w_b_obj = (int*)baseHandle->GetWriteRegion();
+    int (*w_a_obj)[16] = (int (*)[16])handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* c = new (std::align_val_t{64}) int[0x10000];
+    int* b = new (std::align_val_t{64}) int[0x100000];
+    int (*a)[16] = new (std::align_val_t{64}) int[0x100000][16];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> c_dist(0, 0x100000-16);
+    std::uniform_int_distribution<int> b_dist(0, 0x100000-1);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+
+    for (int i = 0; i < 0x10000; i++)
+    {
+        int val = c_dist(rng);
+        w_meta[i] = val;
+        c[i] = val;
+    }
+
+    for (int i = 0; i < 0x100000; i++)
+    {
+        int val = b_dist(rng);
+        w_b_obj[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x100000; i++)
+    {
+        for (int d = 0; d < 16; d++)
+        {
+            int val = dist(rng);
+            w_a_obj[i][d] = val;
+            a[i][d] = val;
+        }
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x10000; i++)
+    {
+        for (int j = 0; j < 16; j++)
+        {
+            for (int d = 0; d < 16; d++)
+            {
+                hash1 += a[b[c[i]+j]][d];
+            }
+        }
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    ::operator delete[](a, std::align_val_t{64});
+    ::operator delete[](b, std::align_val_t{64});
+    ::operator delete[](c, std::align_val_t{64});
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_MediumDoubleIndirectEmbedding(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["mediumDoubleIndirectEmbedding"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    // 32 four-byte values per row; exactly 16 embeddings per i (0 <= j < 16).
+    assert(handle->m_MetaDataRegions.find("indirect_stream") != handle->m_MetaDataRegions.end());
+    assert(handle->m_SubHandles.find("base") != handle->m_SubHandles.end());
+    DTL::DTUResourceHandle* baseHandle = handle->m_SubHandles.at("base");
+    assert(baseHandle != nullptr);
+    assert(baseHandle->m_MetaDataRegions.find("i_stream") != baseHandle->m_MetaDataRegions.end());
+
+    DTL::MetadataRegion* metastream = baseHandle->m_MetaDataRegions.at("i_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int* w_b_obj = (int*)baseHandle->GetWriteRegion();
+    int (*w_a_obj)[32] = (int (*)[32])handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* c = new (std::align_val_t{64}) int[0x8000];
+    int* b = new (std::align_val_t{64}) int[0x80000];
+    int (*a)[32] = new (std::align_val_t{64}) int[0x80000][32];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> c_dist(0, 0x80000-16);
+    std::uniform_int_distribution<int> b_dist(0, 0x80000-1);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+
+    for (int i = 0; i < 0x8000; i++)
+    {
+        int val = c_dist(rng);
+        w_meta[i] = val;
+        c[i] = val;
+    }
+
+    for (int i = 0; i < 0x80000; i++)
+    {
+        int val = b_dist(rng);
+        w_b_obj[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x80000; i++)
+    {
+        for (int d = 0; d < 32; d++)
+        {
+            int val = dist(rng);
+            w_a_obj[i][d] = val;
+            a[i][d] = val;
+        }
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x8000; i++)
+    {
+        for (int j = 0; j < 16; j++)
+        {
+            for (int d = 0; d < 32; d++)
+            {
+                hash1 += a[b[c[i]+j]][d];
+            }
+        }
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    ::operator delete[](a, std::align_val_t{64});
+    ::operator delete[](b, std::align_val_t{64});
+    ::operator delete[](c, std::align_val_t{64});
+    api->FreeDTUResourceHandle(handle);
+    return "";
+}
+
+std::string benchmark::bench_LargeDoubleIndirectEmbedding(const BenchmarkData &bench_data, DTL::API *api)
+{
+    std::string results;
+    PerfManager perf;
+
+
+    DTL::CompiledDTLProgram prog = api->CompileProgram(dtl_stencil_configs["largeDoubleIndirectEmbedding"]);
+    if (!api->CheckHasAvailableResources(prog))
+    {
+        printf("Does not have available resources\n");
+        return "";
+    }
+
+    DTL::DTUResourceHandle* handle = api->MapToDTUHardware(prog);
+    if (handle == nullptr)
+    {
+        printf("handle == nullptr!\n");
+        return "";
+    }
+
+    // 64 four-byte values per row; exactly 16 embeddings per i (0 <= j < 16).
+    assert(handle->m_MetaDataRegions.find("indirect_stream") != handle->m_MetaDataRegions.end());
+    assert(handle->m_SubHandles.find("base") != handle->m_SubHandles.end());
+    DTL::DTUResourceHandle* baseHandle = handle->m_SubHandles.at("base");
+    assert(baseHandle != nullptr);
+    assert(baseHandle->m_MetaDataRegions.find("i_stream") != baseHandle->m_MetaDataRegions.end());
+
+    DTL::MetadataRegion* metastream = baseHandle->m_MetaDataRegions.at("i_stream");
+    assert(metastream->isNormalMemoryRegion());
+    int* w_meta = (int*)metastream->GetMetadataWriteRegion();
+    int* w_b_obj = (int*)baseHandle->GetWriteRegion();
+    int (*w_a_obj)[64] = (int (*)[64])handle->GetWriteRegion();
+    int* r_a_obj = (int*)handle->GetReadRegion();
+
+    int* c = new (std::align_val_t{64}) int[0x4000];
+    int* b = new (std::align_val_t{64}) int[0x40000];
+    int (*a)[64] = new (std::align_val_t{64}) int[0x40000][64];
+
+    std::mt19937 rng(12345);
+    std::uniform_int_distribution<int> c_dist(0, 0x40000-16);
+    std::uniform_int_distribution<int> b_dist(0, 0x40000-1);
+    std::uniform_int_distribution<int> dist(0, 0x1000000-1);
+
+    for (int i = 0; i < 0x4000; i++)
+    {
+        int val = c_dist(rng);
+        w_meta[i] = val;
+        c[i] = val;
+    }
+
+    for (int i = 0; i < 0x40000; i++)
+    {
+        int val = b_dist(rng);
+        w_b_obj[i] = val;
+        b[i] = val;
+    }
+
+    for (int i = 0; i < 0x40000; i++)
+    {
+        for (int d = 0; d < 64; d++)
+        {
+            int val = dist(rng);
+            w_a_obj[i][d] = val;
+            a[i][d] = val;
+        }
+    }
+
+    // Publish backing/metadata initialization before the DTU can consume it.
+    DTL::DeviceMemoryFence();
+    uint64_t hash1 = 0;
+    perf.CollectCounters();
+
+    for (int i = 0; i < 0x4000; i++)
+    {
+        for (int j = 0; j < 16; j++)
+        {
+            for (int d = 0; d < 64; d++)
+            {
+                hash1 += a[b[c[i]+j]][d];
+            }
+        }
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash1) << "\n";
+
+    // Complete setup and prior accesses before starting the timed DTU reads.
+    DTL::DeviceMemoryFence();
+    uint64_t hash2 = 0;
+    perf.CollectCounters();
+    for (int i = 0; i < 0x1000000; i++)
+    {
+        hash2 += r_a_obj[i];
+    }
+    perf.CollectDelta();
+    std::cout << perf.PrintCountersLabel() << ",hash\n";
+    std::cout << perf.PrintCounters() << "," << std::to_string(hash2) << "\n";
+
+    ::operator delete[](a, std::align_val_t{64});
+    ::operator delete[](b, std::align_val_t{64});
+    ::operator delete[](c, std::align_val_t{64});
     api->FreeDTUResourceHandle(handle);
     return "";
 }

@@ -14,7 +14,7 @@ struct HandleDeleter {
     DTL::API* api;
     void operator()(DTL::DTUResourceHandle* handle) const {
         api->FreeDTUResourceHandle(handle);
-        delete handle;
+        //delete handle;
     }
 };
 using Handle = std::unique_ptr<DTL::DTUResourceHandle, HandleDeleter>;
@@ -59,10 +59,10 @@ std::string benchmark::bench_wrapper_gradzatz_invert(const BenchmarkData& bench_
     combined.m_NeededConfigs = volume_prog.m_NeededConfigs + gradient_prog.m_NeededConfigs;
     if (!api->CheckHasAvailableResources(combined))
         throw std::runtime_error("Insufficient DTU configurations for gradzatz");
-    Handle volumes(api->MapTODTUHardware(volume_prog), HandleDeleter{api});
+    Handle volumes(api->MapToDTUHardware(volume_prog), HandleDeleter{api});
     if (!volumes)
         throw std::runtime_error("Failed to map gradzatz volumes");
-    Handle gradients(api->MapTODTUHardware(gradient_prog), HandleDeleter{api});
+    Handle gradients(api->MapToDTUHardware(gradient_prog), HandleDeleter{api});
     if (!gradients)
         throw std::runtime_error("Failed to map gradzatz gradients");
     volumes->m_MainRegion->SetDataSize(sizeof(float));

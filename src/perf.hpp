@@ -29,7 +29,7 @@
 
 
 
-//#define INCLUDE_INCLUSIVE_LLC_COUNTERS
+#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 //#define INCLUDE_BOOM_PERF_EXTRA
 //#define INCLUDE_INCLUSIVE_LLC_COUNTERS
 #define INCLUDE_DTU_PERF_COUNTERS
@@ -73,10 +73,14 @@
 
 #define DTU_ACCESS 0xf00
 #define NON_DTU_ACCESS 0xf08
+#define PREFETCH_DTU_ACCESS 0xf10
+#define LLCPORT_DTU_ACCESS 0xf18
 
 
 #define READ_DTU_ACCESS(base) (READ_UINT64(base + DTU_ACCESS))
 #define READ_NONDTU_ACCESS(base) (READ_UINT64(base + NON_DTU_ACCESS))
+#define READ_PREFETCHDTU_ACCESS(base) (READ_UINT64(base + PREFETCH_DTU_ACCESS))
+#define READ_LLCPORTDTU_ACCESS(base) (READ_UINT64(base + LLCPORT_DTU_ACCESS))
 
 #endif
 
@@ -115,6 +119,8 @@ struct RocketChipCounters
 #ifdef INCLUDE_DTU_PERF_COUNTERS
     uint64_t RegularDRAMAccess;
     uint64_t DTUDramAccess;
+    uint64_t DTUPrefetchAccess;
+    uint64_t DTULLCAccess;
 #endif
 };
 
